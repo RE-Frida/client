@@ -174,20 +174,28 @@ async fn connect_with_tls(
     if use_tls {
         dbg_log!("Connecting with TLS using embedded certificate");
 
-        // Build TLS connector with embedded cert
-        // Since we accept self-signed certs (our own), we skip cert verification
-        // and rely on SPKI pinning for security
-        let connector = native_tls::TlsConnector::builder()
-            .danger_accept_invalid_certs(true)
-            .build()
+        // Build TLS connector that trusts our embedded self-signed cert
+        let mut builder = native_tls::TlsConnector::builder();
+
+        // Add our embedded cert as a trusted root CA
+        let cert = native_tls::Certificate::from_pem(EMBEDDED_CERT)
+            .map_err(|e| format!("Failed to parse embedded cert: {}", e))?;
+        builder.add_root_certificate(cert);
+
+        let connector = builder.build()
             .map_err(|e| format!("TLS connector failed: {}", e))?;
 
-        // Use tokio-tungstenite with native-tls
-        let (ws_stream, _) = tokio_tungstenite::connect_async(url)
-            .await
-            .map_err(|e| format!("TLS connection failed: {}", e))?;
+        // Use connect_async_tls_with_config with custom connector
+        let (ws_stream, _) = tokio_tungstenite::connect_async_tls_with_config(
+            url,
+            None,
+            false,
+            Some(tokio_tungstenite::Connector::NativeTls(connector)),
+        )
+        .await
+        .map_err(|e| format!("TLS connection failed: {}", e))?;
 
-        dbg_log!("TLS connection established");
+        dbg_log!("TLS connection established with embedded cert verification");
 
         Ok(ws_stream)
     } else {
