@@ -11,7 +11,8 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 
 // Embedded SPKI pin for the server's TLS certificate
 // This is the SHA-256 hash of the SubjectPublicKeyInfo of the server cert
-// Generated at build time or hardcoded after first connection
+// Hardcoded at compile time from spki_pin.txt
+const EMBEDDED_SPKI_PIN: &str = include_str!("../spki_pin.txt");
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -67,12 +68,9 @@ pub fn verify_spki_pin(cert_der: &[u8]) -> bool {
     constant_time_compare(encoded.as_bytes(), pin.as_bytes())
 }
 
-/// Get the stored SPKI pin
+/// Get the stored SPKI pin (embedded at compile time)
 pub fn get_stored_pin() -> String {
-    // Read pin from file at runtime (not const)
-    std::fs::read_to_string("spki_pin.txt")
-        .map(|s| s.trim().to_string())
-        .unwrap_or_default()
+    EMBEDDED_SPKI_PIN.trim().to_string()
 }
 
 /// Compute SPKI pin from DER-encoded certificate

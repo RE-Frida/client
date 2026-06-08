@@ -5812,3 +5812,8 @@ name = "zmij"
 version = "1.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
+
+[[patch.unused]]
+name = "glib"
+version = "0.20.0"
+source = "git+https://github.com/gtk-rs/gtk-rs-core.git?tag=0.20.0#184abe83f5ccf36b80687b9ff2ed4764faf5dd88"
