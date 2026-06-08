@@ -4,8 +4,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScriptEditor } from "@/components/ui/script-editor";
 
 interface FileNode {
   name: string;
@@ -36,17 +36,6 @@ export function EditorPage({ onLog }: EditorPageProps) {
   const [selectedFile, setSelectedFile] = useState<FileNode | null>(null);
   const [code, setCode] = useState("");
   const [newFileName, setNewFileName] = useState("");
-
-  const findFile = (nodes: FileNode[], name: string): FileNode | null => {
-    for (const node of nodes) {
-      if (node.name === name && node.type === "file") return node;
-      if (node.children) {
-        const found = findFile(node.children, name);
-        if (found) return found;
-      }
-    }
-    return null;
-  };
 
   const selectFile = (node: FileNode) => {
     if (node.type === "file") {
@@ -144,13 +133,11 @@ export function EditorPage({ onLog }: EditorPageProps) {
             </Button>
           </div>
         </div>
-        <div className="flex-1">
+        <div className="flex-1 overflow-hidden">
           {selectedFile ? (
-            <Textarea
+            <ScriptEditor
               value={code}
-              onChange={(e) => setCode(e.target.value)}
-              className="h-full resize-none rounded-none border-0 font-mono text-xs focus-visible:ring-0"
-              placeholder="Write your Frida script..."
+              onChange={setCode}
             />
           ) : (
             <div className="flex h-full items-center justify-center text-muted-foreground">

@@ -3,7 +3,7 @@ import {
   Play, Square, Send, Smartphone, Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { ScriptEditor } from "@/components/ui/script-editor";
 import { getConfig, startSession, executeScript, launchApp, killApp } from "@/hooks/tauri";
 import type { AppConfig } from "@/types";
 
@@ -90,12 +90,10 @@ export function Dashboard({ selectedDevice }: DashboardProps) {
       </div>
 
       {/* Script Editor */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Textarea
+      <div className="flex-1 overflow-hidden">
+        <ScriptEditor
           value={scriptCode}
-          onChange={(e) => setScriptCode(e.target.value)}
-          className="flex-1 resize-none rounded-none border-0 font-mono text-xs focus-visible:ring-0"
-          placeholder="Enter Frida script..."
+          onChange={setScriptCode}
         />
       </div>
 

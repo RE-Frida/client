@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { TitleBar } from "@/components/layout/TitleBar";
 import { Dashboard } from "@/components/pages/Dashboard";
 import { LogsPage } from "@/components/pages/LogsPage";
 import { Marketplace } from "@/components/pages/MarketplacePage";
@@ -49,12 +50,15 @@ export default function App() {
 
   if (!connected || !auth?.authenticated) {
     return (
-      <LoginPage
-        connected={connected}
-        onLoginSuccess={() => {
-          getAuthState().then(setAuth).catch(() => {});
-        }}
-      />
+      <div className="flex h-screen flex-col">
+        <TitleBar />
+        <LoginPage
+          connected={connected}
+          onLoginSuccess={() => {
+            getAuthState().then(setAuth).catch(() => {});
+          }}
+        />
+      </div>
     );
   }
 
@@ -76,21 +80,24 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background text-foreground">
-      <Sidebar
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        auth={auth}
-        devices={devices}
-        selectedDevice={selectedDevice}
-        onDeviceChange={setSelectedDevice}
-        onLogout={() => {
-          setAuth({ authenticated: false, username: null, avatar_url: null, token: null });
-        }}
-      />
-      <main className="flex-1 overflow-auto">
-        {renderContent()}
-      </main>
+    <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
+      <TitleBar />
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          auth={auth}
+          devices={devices}
+          selectedDevice={selectedDevice}
+          onDeviceChange={setSelectedDevice}
+          onLogout={() => {
+            setAuth({ authenticated: false, username: null, avatar_url: null, token: null });
+          }}
+        />
+        <main className="flex-1 overflow-auto">
+          {renderContent()}
+        </main>
+      </div>
     </div>
   );
 }
