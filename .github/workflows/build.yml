@@ -1,0 +1,171 @@
+name: Build Client
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: client-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: re-frida-linux-amd64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: re-frida-windows-amd64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: tauri-${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}
+          restore-keys: |
+            tauri-${{ runner.os }}-cargo-
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Download ADB + frida-inject (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p src-tauri/tools
+          cd src-tauri/tools
+          # ADB
+          curl -sL "https://dl.google.com/android/repository/platform-tools-latest-linux.zip" -o pt.zip
+          unzip -qo pt.zip
+          cp platform-tools/adb ./adb
+          chmod +x ./adb
+          rm -rf platform-tools pt.zip
+          # frida-inject
+          FRIDA_TAG=$(curl -sLI -o /dev/null -w '%{url_effective}' "https://github.com/frida/frida/releases/latest" | xargs basename)
+          FRIDA_VER="${FRIDA_TAG#v}"
+          echo "Downloading frida-inject v${FRIDA_VER}"
+          BASE_URL="https://github.com/frida/frida/releases/download/${FRIDA_TAG}"
+          curl -sL "${BASE_URL}/frida-inject-${FRIDA_VER}-linux-x86_64.xz" -o fi.xz
+          xz -df fi.xz
+          mv fi frida-inject
+          chmod +x frida-inject
+
+      - name: Download ADB + frida-inject (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path src-tauri/tools
+          cd src-tauri/tools
+          # ADB
+          Invoke-WebRequest -Uri "https://dl.google.com/android/repository/platform-tools-latest-windows.zip" -OutFile pt.zip
+          Expand-Archive -Path pt.zip -DestinationPath . -Force
+          Copy-Item platform-tools/adb.exe ./adb.exe
+          Copy-Item platform-tools/AdbWinApi.dll ./AdbWinApi.dll -ErrorAction SilentlyContinue
+          Copy-Item platform-tools/AdbWinUsbApi.dll ./AdbWinUsbApi.dll -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force platform-tools, pt.zip
+          # frida-inject
+          $resp = Invoke-WebRequest -Uri "https://github.com/frida/frida/releases/latest" -MaximumRedirection 0 -ErrorAction SilentlyContinue -SkipHttpErrorCheck
+          $fridaTag = ($resp.Headers.Location -split '/')[-1]
+          $fridaVer = $fridaTag -replace '^v',''
+          Write-Host "Downloading frida-inject v${fridaVer}"
+          $baseUrl = "https://github.com/frida/frida/releases/download/${fridaTag}"
+          Invoke-WebRequest -Uri "${baseUrl}/frida-inject-${fridaVer}-windows-x86_64.xz" -OutFile fi.xz
+          & xz -df fi.xz
+          Rename-Item fi frida-inject.exe
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        with:
+          args: --target ${{ matrix.target }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.deb
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.AppImage
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.msi
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.exe
+
+  release:
+    name: Release
+    needs: [build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Bump patch version
+        id: version
+        run: |
+          CURRENT=$(grep '"version"' src-tauri/tauri.conf.json | head -1 | sed 's/.*"\([0-9.]*\)".*/\1/')
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+          echo "old=${CURRENT}" >> $GITHUB_OUTPUT
+          echo "new=${NEW_VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=v${NEW_VERSION}" >> $GITHUB_OUTPUT
+          sed -i "s/\"version\": \"${CURRENT}\"/\"version\": \"${NEW_VERSION}\"/" src-tauri/tauri.conf.json
+
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src-tauri/tauri.conf.json
+          git commit -m "chore: bump version to ${{ steps.version.outputs.new }}" || echo "No changes"
+          git tag -d ${{ steps.version.outputs.tag }} 2>/dev/null || true
+          git push origin :refs/tags/${{ steps.version.outputs.tag }} 2>/dev/null || true
+          git tag ${{ steps.version.outputs.tag }}
+          git push origin main --tags
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "RE:Frida Client ${{ steps.version.outputs.new }}"
+          generate_release_notes: true
+          files: artifacts/**/*
