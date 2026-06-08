@@ -1,123 +1,39 @@
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 fn main() {
-    // Generate TLS certs and SPKI pin if missing
     let cert_dir = Path::new("../certs");
     let cert_path = cert_dir.join("server_cert.pem");
     let key_path = cert_dir.join("server_key.pem");
-    let pin_path = Path::new("spki_pin.txt");
+    let pin_path = cert_dir.join("spki_pin.txt");
 
-    // Embedded cert paths (copied at build time)
-    let embedded_cert = Path::new("embedded_cert.pem");
-    let embedded_key = Path::new("embedded_key.pem");
-
-    if !cert_path.exists() || !key_path.exists() {
-        println!("cargo:warning=Generating self-signed TLS certificate...");
-        fs::create_dir_all(cert_dir).expect("Failed to create certs directory");
-
-        let output = Command::new("openssl")
-            .args([
-                "req", "-x509", "-newkey", "ec",
-                "-pkeyopt", "ec_paramgen_curve:prime256v1",
-                "-keyout", key_path.to_str().unwrap(),
-                "-out", cert_path.to_str().unwrap(),
-                "-days", "3650", "-nodes",
-                "-subj", "/CN=refrida.local",
-                "-addext", "subjectAltName=IP:10.1.3.22,DNS:localhost",
-            ])
-            .output()
-            .expect("Failed to run openssl (is it installed?)");
-
-        if !output.status.success() {
-            panic!(
-                "openssl failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            );
-        }
-        println!("cargo:warning=Certificate generated at {}", cert_path.display());
-    }
+    // Panic if certs folder doesn't exist
+    assert!(
+        cert_path.exists(),
+        "Certs not found at {}. Run ./generate-certs.sh first!",
+        cert_dir.display()
+    );
+    assert!(
+        key_path.exists(),
+        "Key not found at {}. Run ./generate-certs.sh first!",
+        cert_dir.display()
+    );
+    assert!(
+        pin_path.exists(),
+        "SPKI pin not found at {}. Run ./generate-certs.sh first!",
+        pin_path.display()
+    );
 
     // Copy certs to src-tauri for embedding
-    fs::copy(&cert_path, &embedded_cert).expect("Failed to copy cert for embedding");
-    fs::copy(&key_path, &embedded_key).expect("Failed to copy key for embedding");
-    println!("cargo:warning=Certs copied for embedding");
+    fs::copy(&cert_path, "embedded_cert.pem").expect("Failed to copy cert");
+    fs::copy(&key_path, "embedded_key.pem").expect("Failed to copy key");
+    fs::copy(&pin_path, "spki_pin.txt").expect("Failed to copy pin");
 
-    // Extract SPKI pin from cert
-    if !pin_path.exists() || cert_path.metadata().unwrap().modified().unwrap()
-        > pin_path.metadata().unwrap().modified().unwrap()
-    {
-        println!("cargo:warning=Extracting SPKI pin from certificate...");
-
-        let pubkey = Command::new("openssl")
-            .args(["x509", "-in", cert_path.to_str().unwrap(), "-pubkey", "-noout"])
-            .output()
-            .expect("Failed to extract public key");
-
-        assert!(pubkey.status.success(), "Failed to extract public key");
-
-        let der = Command::new("openssl")
-            .args(["pkey", "-pubin", "-outform", "DER"])
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .spawn()
-            .and_then(|mut child| {
-                use std::io::Write;
-                child.stdin.as_mut().unwrap().write_all(&pubkey.stdout)?;
-                child.wait_with_output()
-            })
-            .expect("Failed to convert to DER");
-
-        assert!(der.status.success(), "Failed to convert to DER");
-
-        let hash = Command::new("openssl")
-            .args(["dgst", "-sha256", "-binary"])
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .spawn()
-            .and_then(|mut child| {
-                use std::io::Write;
-                child.stdin.as_mut().unwrap().write_all(&der.stdout)?;
-                child.wait_with_output()
-            })
-            .expect("Failed to hash");
-
-        assert!(hash.status.success(), "Failed to hash");
-
-        let b64 = Command::new("openssl")
-            .args(["base64", "-A"])
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .spawn()
-            .and_then(|mut child| {
-                use std::io::Write;
-                child.stdin.as_mut().unwrap().write_all(&hash.stdout)?;
-                child.wait_with_output()
-            })
-            .expect("Failed to base64 encode");
-
-        assert!(b64.status.success(), "Failed to base64 encode");
-
-        let pin = format!(
-            "sha256/{}",
-            String::from_utf8_lossy(&b64.stdout).trim()
-        );
-
-        fs::write(pin_path, &pin).expect("Failed to write SPKI pin");
-        println!("cargo:warning=SPKI pin: {}", pin);
-    }
-
-    // Tell cargo to rerun if cert or pin changes
+    println!("cargo:warning=Certs embedded from {}", cert_dir.display());
     println!("cargo:rerun-if-changed={}", cert_path.display());
     println!("cargo:rerun-if-changed={}", key_path.display());
     println!("cargo:rerun-if-changed={}", pin_path.display());
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=embedded_cert.pem");
-    println!("cargo:rerun-if-changed=embedded_key.pem");
 
     tauri_build::build();
 }
