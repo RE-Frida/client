@@ -4,7 +4,7 @@ use std::process::Command;
 
 fn main() {
     // Generate TLS certs and SPKI pin if missing
-    let cert_dir = Path::new("../server/certs");
+    let cert_dir = Path::new("../certs");
     let cert_path = cert_dir.join("server_cert.pem");
     let key_path = cert_dir.join("server_key.pem");
     let pin_path = Path::new("spki_pin.txt");
