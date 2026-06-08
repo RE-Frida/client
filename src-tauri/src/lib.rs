@@ -1,6 +1,8 @@
 mod binary;
 mod commands;
 mod config;
+mod crypto;
+mod security;
 mod state;
 mod types;
 mod ws;
@@ -29,6 +31,13 @@ async fn is_debug_build() -> Result<bool, String> {
     Ok(cfg!(feature = "debug"))
 }
 
+// ─── Security Info ──────────────────────────────────────────────
+
+#[tauri::command]
+async fn get_security_report() -> Result<String, String> {
+    Ok(security::security_report())
+}
+
 // ─── Entry Point ────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -38,6 +47,39 @@ pub fn run() {
         env_logger::init();
         state::dbg_log!("Debug build - verbose logging enabled");
     }
+
+    // ─── Security Checks ────────────────────────────────────────
+
+    // Anti-dump protection
+    security::anti_dump();
+
+    // Anti-debug check (warn but don't block in development)
+    if security::is_debugger_attached() {
+        state::dbg_log!("WARNING: Debugger detected");
+        #[cfg(not(feature = "debug"))]
+        {
+            // In release mode, exit if debugger detected
+            // Uncomment to enable:
+            // std::process::exit(1);
+        }
+    }
+
+    // VM detection (informational)
+    if security::is_vm() {
+        state::dbg_log!("WARNING: Virtual machine detected");
+    }
+
+    // Verify self-integrity
+    if !security::verify_self_integrity() {
+        state::dbg_log!("WARNING: Binary integrity check failed");
+    }
+
+    // Opaque predicate (confuse static analysis)
+    if security::opaque_true() {
+        state::dbg_log!("Security check passed");
+    }
+
+    // ─── App Setup ──────────────────────────────────────────────
 
     let state = AppState::new();
 
@@ -76,6 +118,7 @@ pub fn run() {
             is_connected,
             get_app_version,
             is_debug_build,
+            get_security_report,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

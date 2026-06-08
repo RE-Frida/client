@@ -29,6 +29,7 @@ env_logger = "0.11"
 
 # WebSocket client
 tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
+tokio-native-tls = "0.3"
 futures = "0.3"
 native-tls = "0.2"
 
@@ -37,6 +38,11 @@ sha2 = "0.10"
 base64 = "0.22"
 hex = "0.4"
 uuid = { version = "1", features = ["v4"] }
+chacha20poly1305 = "0.10"
+hmac = "0.12"
+rand = "0.8"
+zeroize = { version = "1", features = ["derive"] }
+x509-cert = "0.2"
 
 # HTTP
 reqwest = { version = "0.12", features = ["rustls-tls"], default-features = false }
@@ -46,6 +52,7 @@ dirs = "6"
 open = "5"
 url = "2"
 regex = "1"
+libc = "0.2"
 
 [features]
 default = ["custom-protocol"]
