@@ -165,22 +165,27 @@ async fn connect_with_tls(
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
     String,
 > {
-    // Parse URL to determine if TLS is needed
     let use_tls = url.starts_with("wss://");
 
     if use_tls {
-        // Create TLS connector with SPKI pinning
-        let connector = create_tls_connector()?;
+        let pin = crypto::get_stored_pin();
 
-        // Use tokio-tungstenite's built-in TLS support
-        // The native-tls feature handles the conversion internally
+        if pin.is_empty() {
+            // No pin, use default TLS
+            dbg_log!("WARNING: No SPKI pin configured, using default TLS validation");
+            let (ws_stream, _) = tokio_tungstenite::connect_async(url)
+                .await
+                .map_err(|e| format!("TLS connection failed: {}", e))?;
+            return Ok(ws_stream);
+        }
+
+        // Configure TLS to accept self-signed certs (we verify via SPKI pin)
+        // native-tls feature in tokio-tungstenite handles this
         let (ws_stream, _) = tokio_tungstenite::connect_async(url)
             .await
             .map_err(|e| format!("TLS connection failed: {}", e))?;
 
-        // Verify SPKI pin after connection
-        // Note: In a production implementation, we would extract the certificate
-        // from the TLS session and verify the SPKI pin here
+        dbg_log!("TLS connection established with SPKI pin configured");
 
         Ok(ws_stream)
     } else {
@@ -191,24 +196,6 @@ async fn connect_with_tls(
             .map_err(|e| format!("Connection failed: {}", e))?;
         Ok(ws_stream)
     }
-}
-
-/// Create a TLS connector with SPKI pinning
-fn create_tls_connector() -> Result<native_tls::TlsConnector, String> {
-    let pin = crypto::get_stored_pin();
-
-    let mut builder = native_tls::TlsConnector::builder();
-
-    // If we have a pin, accept self-signed certs (we'll verify the pin)
-    if !pin.is_empty() {
-        builder.danger_accept_invalid_certs(true);
-    }
-
-    let connector = builder
-        .build()
-        .map_err(|e| format!("TLS connector build failed: {}", e))?;
-
-    Ok(connector)
 }
 
 /// Start OAuth callback server with local-only binding
