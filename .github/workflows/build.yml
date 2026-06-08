@@ -64,22 +64,15 @@ jobs:
             libssl-dev \
             xz-utils
 
-      - name: Cache cargo
+      - name: Cache tools
+        id: cache-tools
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            src-tauri/target
-          key: tauri-${{ runner.os }}-${{ matrix.profile }}-cargo-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}
-          restore-keys: |
-            tauri-${{ runner.os }}-${{ matrix.profile }}-cargo-
-
-      - name: Install frontend dependencies
-        run: npm ci
+          path: src-tauri/tools
+          key: tools-${{ runner.os }}-${{ matrix.target }}-frida16
 
       - name: Download ADB + frida (Linux)
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && steps.cache-tools.outputs.cache-hit != 'true'
         run: |
           TRIPLE="${{ matrix.target }}"
           mkdir -p src-tauri/tools
@@ -101,7 +94,7 @@ jobs:
           chmod +x "frida-inject-${TRIPLE}"
 
       - name: Download ADB + frida (Windows)
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && steps.cache-tools.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $triple = "${{ matrix.target }}"
@@ -124,6 +117,20 @@ jobs:
           & xz -df "frida-inject.exe.xz"
           Rename-Item "frida-inject.exe" "frida-inject-${triple}.exe"
 
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: tauri-${{ runner.os }}-${{ matrix.profile }}-cargo-${{ hashFiles('Cargo.lock', 'Cargo.toml', 'src-tauri/Cargo.toml', 'protocol/Cargo.toml') }}
+          restore-keys: |
+            tauri-${{ runner.os }}-${{ matrix.profile }}-cargo-
+
+      - name: Install frontend dependencies
+        run: npm ci
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         with:
@@ -135,7 +142,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: src-tauri/target/${{ matrix.target }}/release/re-frida-tauri
+          path: target/${{ matrix.target }}/release/re-frida-tauri
 
   release:
     name: Release
