@@ -48,8 +48,6 @@ export function Sidebar({
     }
   };
 
-  const selectedModel = devices.find((d) => d.id === selectedDevice)?.model;
-
   return (
     <aside className="flex h-full w-56 flex-col border-r border-sidebar-border bg-sidebar">
       {/* Logo */}
