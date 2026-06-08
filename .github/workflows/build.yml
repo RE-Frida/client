@@ -10,7 +10,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build (${{ matrix.os }})
+    name: Build (${{ matrix.os }}, ${{ matrix.profile }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -19,9 +19,23 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             artifact: re-frida-linux-amd64
+            profile: release
+            features: ""
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: re-frida-linux-amd64-debug
+            profile: debug
+            features: "--features debug"
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact: re-frida-windows-amd64
+            profile: release
+            features: ""
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: re-frida-windows-amd64-debug
+            profile: debug
+            features: "--features debug"
 
     steps:
       - uses: actions/checkout@v4
@@ -47,7 +61,8 @@ jobs:
             libgtk-3-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev \
-            libssl-dev
+            libssl-dev \
+            xz-utils
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -56,61 +71,63 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             src-tauri/target
-          key: tauri-${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}
+          key: tauri-${{ runner.os }}-${{ matrix.profile }}-cargo-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}
           restore-keys: |
-            tauri-${{ runner.os }}-cargo-
+            tauri-${{ runner.os }}-${{ matrix.profile }}-cargo-
 
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Download ADB + frida-inject (Linux)
+      - name: Download ADB + frida (Linux)
         if: runner.os == 'Linux'
         run: |
+          TRIPLE="${{ matrix.target }}"
           mkdir -p src-tauri/tools
           cd src-tauri/tools
           # ADB
           curl -sL "https://dl.google.com/android/repository/platform-tools-latest-linux.zip" -o pt.zip
           unzip -qo pt.zip
-          cp platform-tools/adb ./adb
-          chmod +x ./adb
+          cp platform-tools/adb "./adb-${TRIPLE}"
+          chmod +x "./adb-${TRIPLE}"
           rm -rf platform-tools pt.zip
-          # frida-inject
+          # frida CLI
           FRIDA_TAG=$(curl -sLI -o /dev/null -w '%{url_effective}' "https://github.com/frida/frida/releases/latest" | xargs basename)
           FRIDA_VER="${FRIDA_TAG#v}"
-          echo "Downloading frida-inject v${FRIDA_VER}"
+          echo "Downloading frida v${FRIDA_VER}"
           BASE_URL="https://github.com/frida/frida/releases/download/${FRIDA_TAG}"
-          curl -sL "${BASE_URL}/frida-inject-${FRIDA_VER}-linux-x86_64.xz" -o fi.xz
-          xz -df fi.xz
-          mv fi frida-inject
-          chmod +x frida-inject
+          curl -sL "${BASE_URL}/frida-${FRIDA_VER}-linux-x86_64.xz" -o frida.xz
+          xz -df frida.xz
+          mv frida "frida-${TRIPLE}"
+          chmod +x "frida-${TRIPLE}"
 
-      - name: Download ADB + frida-inject (Windows)
+      - name: Download ADB + frida (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          $triple = "${{ matrix.target }}"
           New-Item -ItemType Directory -Force -Path src-tauri/tools
           cd src-tauri/tools
           # ADB
           Invoke-WebRequest -Uri "https://dl.google.com/android/repository/platform-tools-latest-windows.zip" -OutFile pt.zip
           Expand-Archive -Path pt.zip -DestinationPath . -Force
-          Copy-Item platform-tools/adb.exe ./adb.exe
+          Copy-Item platform-tools/adb.exe "adb-${triple}.exe"
           Copy-Item platform-tools/AdbWinApi.dll ./AdbWinApi.dll -ErrorAction SilentlyContinue
           Copy-Item platform-tools/AdbWinUsbApi.dll ./AdbWinUsbApi.dll -ErrorAction SilentlyContinue
           Remove-Item -Recurse -Force platform-tools, pt.zip
-          # frida-inject
+          # frida CLI
           $resp = Invoke-WebRequest -Uri "https://github.com/frida/frida/releases/latest" -MaximumRedirection 0 -ErrorAction SilentlyContinue -SkipHttpErrorCheck
           $fridaTag = ($resp.Headers.Location -split '/')[-1]
           $fridaVer = $fridaTag -replace '^v',''
-          Write-Host "Downloading frida-inject v${fridaVer}"
+          Write-Host "Downloading frida v${fridaVer}"
           $baseUrl = "https://github.com/frida/frida/releases/download/${fridaTag}"
-          Invoke-WebRequest -Uri "${baseUrl}/frida-inject-${fridaVer}-windows-x86_64.xz" -OutFile fi.xz
-          & xz -df fi.xz
-          Rename-Item fi frida-inject.exe
+          Invoke-WebRequest -Uri "${baseUrl}/frida-${fridaVer}-windows-x86_64.xz" -OutFile frida.xz
+          & xz -df frida.xz
+          Rename-Item frida "frida-${triple}.exe"
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         with:
-          args: --target ${{ matrix.target }}
+          args: --target ${{ matrix.target }} ${{ matrix.features }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

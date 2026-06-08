@@ -41,7 +41,7 @@
     ],
     "externalBin": [
       "tools/adb",
-      "tools/frida-inject"
+      "tools/frida"
     ]
   }
 }

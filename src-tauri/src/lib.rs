@@ -3,6 +3,20 @@ use std::process::Command;
 use std::sync::{Arc, Mutex};
 use tauri::State;
 
+// ─── Debug Logging ──────────────────────────────────────────────
+
+#[cfg(feature = "debug")]
+macro_rules! dbg_log {
+    ($($arg:tt)*) => {
+        eprintln!("[DEBUG] {}", format!($($arg)*))
+    };
+}
+
+#[cfg(not(feature = "debug"))]
+macro_rules! dbg_log {
+    ($($arg:tt)*) => {};
+}
+
 // ─── Types ──────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,6 +81,11 @@ pub struct AppState {
 
 impl AppState {
     pub fn new() -> Self {
+        let adb_path = find_binary("adb");
+        let frida_path = find_binary("frida");
+        dbg_log!("ADB path: {}", adb_path);
+        dbg_log!("Frida path: {}", frida_path);
+
         Self {
             config: Arc::new(Mutex::new(AppConfig::default())),
             log_buffer: Arc::new(Mutex::new(Vec::new())),
@@ -76,12 +95,13 @@ impl AppState {
                 avatar_url: None,
                 token: None,
             })),
-            adb_path: find_binary("adb"),
-            frida_path: find_binary("frida-inject"),
+            adb_path,
+            frida_path,
         }
     }
 
     pub fn add_log(&self, line: String) {
+        dbg_log!("LOG: {}", line);
         let mut logs = self.log_buffer.lock().unwrap();
         logs.push(format!("[{}] {}", chrono::Local::now().format("%H:%M:%S"), line));
         if logs.len() > 10000 {
@@ -92,35 +112,50 @@ impl AppState {
 }
 
 fn find_binary(name: &str) -> String {
-    #[cfg(target_os = "windows")]
-    let name = &format!("{}.exe", name);
+    let target = env!("TARGET");
+    let suffix = format!("-{}", target);
 
-    // 1. Check next to the executable
+    #[cfg(target_os = "windows")]
+    let ext = ".exe";
+    #[cfg(not(target_os = "windows"))]
+    let ext = "";
+
+    // 1. Check next to the executable (with target triple)
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
-            let bundled = dir.join("tools").join(name);
+            let bundled = dir.join("tools").join(format!("{}{}{}", name, suffix, ext));
             if bundled.exists() {
                 return bundled.to_string_lossy().to_string();
             }
-            let bundled = dir.join(name);
+            let bundled = dir.join(format!("{}{}{}", name, suffix, ext));
+            if bundled.exists() {
+                return bundled.to_string_lossy().to_string();
+            }
+            // Without target triple
+            let bundled = dir.join("tools").join(format!("{}{}", name, ext));
+            if bundled.exists() {
+                return bundled.to_string_lossy().to_string();
+            }
+            let bundled = dir.join(format!("{}{}", name, ext));
             if bundled.exists() {
                 return bundled.to_string_lossy().to_string();
             }
         }
     }
     // 2. Check current working directory
-    let cwd = std::path::PathBuf::from("tools").join(name);
+    let cwd = std::path::PathBuf::from("tools").join(format!("{}{}", name, ext));
     if cwd.exists() {
         return cwd.to_string_lossy().to_string();
     }
     // 3. Fall back to system PATH
-    name.to_string()
+    format!("{}{}", name, ext)
 }
 
 // ─── ADB Commands ───────────────────────────────────────────────
 
 #[tauri::command]
 async fn discover_devices(state: State<'_, AppState>) -> Result<Vec<DeviceInfo>, String> {
+    dbg_log!("discover_devices called");
     let output = Command::new(&state.adb_path)
         .arg("devices")
         .arg("-l")
@@ -159,12 +194,14 @@ async fn discover_devices(state: State<'_, AppState>) -> Result<Vec<DeviceInfo>,
     }
 
     state.add_log(format!("Discovered {} device(s)", devices.len()));
+    dbg_log!("Found {} devices", devices.len());
     Ok(devices)
 }
 
 #[tauri::command]
 async fn start_session(state: State<'_, AppState>, device_id: String) -> Result<String, String> {
     let port = state.config.lock().unwrap().frida_port;
+    dbg_log!("start_session on device {} port {}", device_id, port);
 
     // Forward port
     let output = Command::new(&state.adb_path)
@@ -187,6 +224,7 @@ async fn start_session(state: State<'_, AppState>, device_id: String) -> Result<
 
 #[tauri::command]
 async fn stop_session(state: State<'_, AppState>) -> Result<String, String> {
+    dbg_log!("stop_session");
     state.add_log("Session stopped".to_string());
     Ok("Session stopped".to_string())
 }
@@ -196,8 +234,9 @@ async fn execute_script(
     state: State<'_, AppState>,
     device_id: String,
     script_code: String,
+    use_gadget: bool,
 ) -> Result<String, String> {
-    let port = state.config.lock().unwrap().frida_port;
+    dbg_log!("execute_script on device {} (gadget={})", device_id, use_gadget);
 
     // Write script to temp file
     let tmp_dir = std::env::temp_dir();
@@ -207,24 +246,39 @@ async fn execute_script(
 
     state.add_log(format!("Executing script on {}", device_id));
 
-    let output = Command::new(&state.frida_path)
-        .arg("-H")
-        .arg(format!("127.0.0.1:{}", port))
-        .arg("-l")
-        .arg(script_path.to_str().unwrap_or(""))
-        .arg("--eternalize")
-        .output()
-        .map_err(|e| format!("frida-inject failed: {}", e));
+    let result = if use_gadget {
+        // Connect to gadget: frida -H 127.0.0.1:<port> -l script.js
+        let port = state.config.lock().unwrap().frida_port;
+        Command::new(&state.frida_path)
+            .arg("-H")
+            .arg(format!("127.0.0.1:{}", port))
+            .arg("-l")
+            .arg(script_path.to_str().unwrap_or(""))
+            .arg("--no-pause")
+            .output()
+    } else {
+        // Direct USB: frida -U -n Gadget -l script.js
+        Command::new(&state.frida_path)
+            .arg("-U")
+            .arg("-n")
+            .arg("Gadget")
+            .arg("-l")
+            .arg(script_path.to_str().unwrap_or(""))
+            .arg("--no-pause")
+            .output()
+    };
 
     let _ = std::fs::remove_file(&script_path);
 
-    match output {
+    match result {
         Ok(out) => {
             let stdout = String::from_utf8_lossy(&out.stdout).to_string();
             let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+            dbg_log!("frida stdout: {}", stdout);
+            dbg_log!("frida stderr: {}", stderr);
             if out.status.success() {
                 state.add_log("Script executed successfully".to_string());
-                Ok(stdout)
+                Ok(if stdout.is_empty() { stderr } else { stdout })
             } else {
                 state.add_log(format!("Script error: {}", stderr));
                 Err(stderr)
@@ -232,7 +286,7 @@ async fn execute_script(
         }
         Err(e) => {
             state.add_log(format!("Execution error: {}", e));
-            Err(e)
+            Err(format!("frida failed: {}", e))
         }
     }
 }
@@ -241,13 +295,14 @@ async fn execute_script(
 async fn push_gadget(
     state: State<'_, AppState>,
     device_id: String,
-    gadget_path: String,
+    gadgetPath: String,
 ) -> Result<String, String> {
+    dbg_log!("push_gadget to {}", device_id);
     let output = Command::new(&state.adb_path)
         .arg("-s")
         .arg(&device_id)
         .arg("push")
-        .arg(&gadget_path)
+        .arg(&gadgetPath)
         .arg("/data/local/tmp/libfrida-gadget.so")
         .output()
         .map_err(|e| format!("Push failed: {}", e))?;
@@ -266,6 +321,7 @@ async fn list_packages(
     state: State<'_, AppState>,
     device_id: String,
 ) -> Result<Vec<String>, String> {
+    dbg_log!("list_packages for {}", device_id);
     let output = Command::new(&state.adb_path)
         .arg("-s")
         .arg(&device_id)
@@ -341,10 +397,21 @@ async fn get_app_version() -> Result<String, String> {
     Ok(env!("CARGO_PKG_VERSION").to_string())
 }
 
+#[tauri::command]
+async fn is_debug_build() -> Result<bool, String> {
+    Ok(cfg!(feature = "debug"))
+}
+
 // ─── Entry Point ────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(feature = "debug")]
+    {
+        env_logger::init();
+        dbg_log!("Debug build - verbose logging enabled");
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
@@ -365,6 +432,7 @@ pub fn run() {
             get_auth_state,
             logout,
             get_app_version,
+            is_debug_build,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

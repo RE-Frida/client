@@ -17,9 +17,10 @@ export async function stopSession(): Promise<string> {
 
 export async function executeScript(
   deviceId: string,
-  scriptCode: string
+  scriptCode: string,
+  useGadget: boolean = false
 ): Promise<string> {
-  return invoke("execute_script", { deviceId, scriptCode });
+  return invoke("execute_script", { deviceId, scriptCode, useGadget });
 }
 
 export async function pushGadget(
@@ -67,4 +68,8 @@ export async function logout(): Promise<void> {
 
 export async function getAppVersion(): Promise<string> {
   return invoke("get_app_version");
+}
+
+export async function isDebugBuild(): Promise<boolean> {
+  return invoke("is_debug_build");
 }
