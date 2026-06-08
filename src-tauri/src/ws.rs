@@ -7,9 +7,8 @@ use re_frida_protocol::*;
 use crate::crypto::{self, CryptoKey, hmac_sign};
 use crate::state::{AppState, PendingRequests, WsClient, SERVER_URL, dbg_log};
 
-// Embedded TLS certificate and key (compiled into binary)
+// Embedded TLS certificate (compiled into binary)
 const EMBEDDED_CERT: &[u8] = include_bytes!("../embedded_cert.pem");
-const EMBEDDED_KEY: &[u8] = include_bytes!("../embedded_key.pem");
 
 /// Connect to the server with TLS and SPKI pinning
 pub async fn connect_ws(state: AppState) {
@@ -25,9 +24,9 @@ pub async fn connect_ws(state: AppState) {
     // Connect with TLS verification
     let ws_stream = match connect_with_tls(url).await {
         Ok(stream) => stream,
-        Err(e) => {
+        Err(_e) => {
             *connected.lock().unwrap() = false;
-            dbg_log!("WS connect failed: {}", e);
+            dbg_log!("WS connect failed: {}", _e);
             return;
         }
     };
