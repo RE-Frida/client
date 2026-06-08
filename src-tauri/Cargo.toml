@@ -48,3 +48,6 @@ regex = "1"
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 debug = []
+
+[profile.release]
+strip = true
