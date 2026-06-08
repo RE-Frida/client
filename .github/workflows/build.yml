@@ -135,7 +135,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: src-tauri/target/${{ matrix.target }}/release/re-frida-tauri*
+          path: src-tauri/target/${{ matrix.target }}/release/re-frida-tauri
 
   release:
     name: Release
