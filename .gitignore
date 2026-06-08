@@ -18,7 +18,7 @@ src-tauri/tools/frida-inject-*
 src-tauri/gen
 src-tauri/spki_pin.txt
 target
-../server/certs/*.pem
+server/certs/
 
 # Editor directories and files
 .vscode/*
