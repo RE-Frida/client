@@ -579,6 +579,61 @@ async fn list_packages(
     Ok(packages)
 }
 
+#[tauri::command]
+async fn launch_app(
+    state: State<'_, AppState>,
+    device_id: String,
+    package_id: String,
+) -> Result<String, String> {
+    dbg_log!("launch_app {} on {}", package_id, device_id);
+    let output = Command::new(&state.adb_path)
+        .arg("-s")
+        .arg(&device_id)
+        .arg("shell")
+        .arg("monkey")
+        .arg("-p")
+        .arg(&package_id)
+        .arg("-c")
+        .arg("android.intent.category.LAUNCHER")
+        .arg("1")
+        .output()
+        .map_err(|e| format!("Failed to launch: {}", e))?;
+
+    if output.status.success() {
+        state.add_log(format!("Launched {}", package_id));
+        Ok(format!("Launched {}", package_id))
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!("Launch error: {}", stderr))
+    }
+}
+
+#[tauri::command]
+async fn kill_app(
+    state: State<'_, AppState>,
+    device_id: String,
+    package_id: String,
+) -> Result<String, String> {
+    dbg_log!("kill_app {} on {}", package_id, device_id);
+    let output = Command::new(&state.adb_path)
+        .arg("-s")
+        .arg(&device_id)
+        .arg("shell")
+        .arg("am")
+        .arg("force-stop")
+        .arg(&package_id)
+        .output()
+        .map_err(|e| format!("Failed to kill: {}", e))?;
+
+    if output.status.success() {
+        state.add_log(format!("Killed {}", package_id));
+        Ok(format!("Killed {}", package_id))
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!("Kill error: {}", stderr))
+    }
+}
+
 // ─── Log Commands ───────────────────────────────────────────────
 
 #[tauri::command]
@@ -815,6 +870,8 @@ pub fn run() {
             execute_script,
             push_gadget,
             list_packages,
+            launch_app,
+            kill_app,
             get_logs,
             clear_logs,
             get_config,

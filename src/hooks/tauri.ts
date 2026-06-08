@@ -34,6 +34,20 @@ export async function listPackages(deviceId: string): Promise<string[]> {
   return invoke("list_packages", { deviceId });
 }
 
+export async function launchApp(
+  deviceId: string,
+  packageId: string
+): Promise<string> {
+  return invoke("launch_app", { deviceId, packageId });
+}
+
+export async function killApp(
+  deviceId: string,
+  packageId: string
+): Promise<string> {
+  return invoke("kill_app", { deviceId, packageId });
+}
+
 // ─── Logs ────────────────────────────────────────────────────────
 
 export async function getLogs(): Promise<string> {

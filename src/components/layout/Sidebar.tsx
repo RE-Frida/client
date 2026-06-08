@@ -1,23 +1,25 @@
-import { useState, useEffect } from "react";
 import {
   LayoutDashboard,
   Store,
   Code2,
   ScrollText,
   Settings,
-  Smartphone,
-  Cpu,
   Zap,
-  LogIn,
   LogOut,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getAuthState, startLogin, logout, isConnected } from "@/hooks/tauri";
-import type { TabId, AuthState } from "@/types";
+import { logout } from "@/hooks/tauri";
+import type { TabId, AuthState, DeviceInfo } from "@/types";
 
 interface SidebarProps {
   activeTab: TabId;
   onTabChange: (tab: TabId) => void;
+  auth: AuthState;
+  devices: DeviceInfo[];
+  selectedDevice: string | null;
+  onDeviceChange: (deviceId: string | null) => void;
+  onLogout: () => void;
 }
 
 const navItems: { id: TabId; label: string; icon: React.ElementType }[] = [
@@ -28,54 +30,25 @@ const navItems: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
-export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
-  const [auth, setAuth] = useState<AuthState>({
-    authenticated: false,
-    username: null,
-    avatar_url: null,
-    token: null,
-  });
-  const [connected, setConnected] = useState(false);
-  const [loggingIn, setLoggingIn] = useState(false);
-
-  useEffect(() => {
-    const poll = setInterval(() => {
-      getAuthState().then(setAuth).catch(() => {});
-      isConnected().then(setConnected).catch(() => {});
-    }, 2000);
-
-    getAuthState().then(setAuth).catch(() => {});
-    isConnected().then(setConnected).catch(() => {});
-
-    return () => clearInterval(poll);
-  }, []);
-
-  const handleLogin = async () => {
-    setLoggingIn(true);
-    try {
-      await startLogin();
-      const state = await getAuthState();
-      setAuth(state);
-    } catch (e) {
-      console.error("Login failed:", e);
-    } finally {
-      setLoggingIn(false);
-    }
-  };
-
+export function Sidebar({
+  activeTab,
+  onTabChange,
+  auth,
+  devices,
+  selectedDevice,
+  onDeviceChange,
+  onLogout,
+}: SidebarProps) {
   const handleLogout = async () => {
     try {
       await logout();
-      setAuth({
-        authenticated: false,
-        username: null,
-        avatar_url: null,
-        token: null,
-      });
+      onLogout();
     } catch (e) {
       console.error("Logout failed:", e);
     }
   };
+
+  const selectedModel = devices.find((d) => d.id === selectedDevice)?.model;
 
   return (
     <aside className="flex h-full w-56 flex-col border-r border-sidebar-border bg-sidebar">
@@ -90,18 +63,25 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
         </div>
       </div>
 
-      {/* Connection Status */}
+      {/* Device Selector */}
       <div className="border-b border-sidebar-border px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div
-            className={cn(
-              "h-2 w-2 rounded-full",
-              connected ? "bg-success" : "bg-muted-foreground"
+        <div className="relative">
+          <select
+            value={selectedDevice || ""}
+            onChange={(e) => onDeviceChange(e.target.value || null)}
+            className="w-full appearance-none rounded-md border border-border bg-background py-1.5 pl-3 pr-8 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            {devices.length === 0 ? (
+              <option value="">No devices</option>
+            ) : (
+              devices.map((dev) => (
+                <option key={dev.id} value={dev.id}>
+                  {dev.model || dev.id} ({dev.status})
+                </option>
+              ))
             )}
-          />
-          <span className="text-xs text-sidebar-foreground">
-            {connected ? "Connected" : "Disconnected"}
-          </span>
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
         </div>
       </div>
 
@@ -130,49 +110,24 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
 
       {/* Auth Section */}
       <div className="border-t border-sidebar-border px-4 py-3">
-        {auth.authenticated ? (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              {auth.avatar_url && (
-                <img
-                  src={auth.avatar_url}
-                  alt="avatar"
-                  className="h-6 w-6 rounded-full"
-                />
-              )}
-              <span className="text-xs font-medium text-sidebar-foreground truncate">
-                {auth.username}
-              </span>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-            >
-              <LogOut className="h-3 w-3" />
-              Logout
-            </button>
-          </div>
-        ) : (
+        <div className="flex items-center gap-2">
+          {auth.avatar_url && (
+            <img
+              src={auth.avatar_url}
+              alt="avatar"
+              className="h-6 w-6 rounded-full"
+            />
+          )}
+          <span className="flex-1 truncate text-xs font-medium text-sidebar-foreground">
+            {auth.username}
+          </span>
           <button
-            onClick={handleLogin}
-            disabled={loggingIn || !connected}
-            className="flex w-full items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleLogout}
+            className="rounded p-1 text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+            title="Logout"
           >
-            <LogIn className="h-3 w-3" />
-            {loggingIn ? "Logging in..." : "Login with Discord"}
+            <LogOut className="h-3.5 w-3.5" />
           </button>
-        )}
-      </div>
-
-      {/* Device Indicator */}
-      <div className="border-t border-sidebar-border px-4 py-3">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Smartphone className="h-3 w-3" />
-          <span>No device</span>
-        </div>
-        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-          <Cpu className="h-3 w-3" />
-          <span>Frida: idle</span>
         </div>
       </div>
     </aside>
