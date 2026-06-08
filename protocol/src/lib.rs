@@ -199,7 +199,6 @@ pub struct DiscordConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerInfo {
-    pub domain: String,
     pub version: String,
 }
 
