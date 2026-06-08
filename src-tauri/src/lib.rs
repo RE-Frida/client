@@ -24,7 +24,7 @@ macro_rules! dbg_log {
 
 // ─── Constants ──────────────────────────────────────────────────
 
-const SERVER_URL: &str = "wss://refrida.rawnullbyte.com";
+const SERVER_URL: &str = "ws://10.1.3.22:3000";
 const OAUTH_CALLBACK_PORT: u16 = 17642;
 
 // ─── Types ──────────────────────────────────────────────────────
