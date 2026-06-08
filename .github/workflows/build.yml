@@ -95,9 +95,10 @@ jobs:
           FRIDA_VER="${FRIDA_TAG#v}"
           echo "Downloading frida v${FRIDA_VER}"
           BASE_URL="https://github.com/frida/frida/releases/download/${FRIDA_TAG}"
-          curl -sL "${BASE_URL}/frida-${FRIDA_VER}-linux-x86_64.xz" -o frida.xz
-          xz -df frida.xz
-          mv frida "frida-${TRIPLE}"
+          curl -sL "${BASE_URL}/frida-${FRIDA_VER}-linux-x86_64.tar.xz" -o frida.tar.xz
+          tar xf frida.tar.xz --strip-components=0
+          mv frida-${FRIDA_VER}-linux-x86_64/frida "frida-${TRIPLE}"
+          rm -rf frida.tar.xz frida-${FRIDA_VER}-linux-x86_64
           chmod +x "frida-${TRIPLE}"
 
       - name: Download ADB + frida (Windows)
@@ -120,9 +121,10 @@ jobs:
           $fridaVer = $fridaTag -replace '^v',''
           Write-Host "Downloading frida v${fridaVer}"
           $baseUrl = "https://github.com/frida/frida/releases/download/${fridaTag}"
-          Invoke-WebRequest -Uri "${baseUrl}/frida-${fridaVer}-windows-x86_64.xz" -OutFile frida.xz
-          & xz -df frida.xz
-          Rename-Item frida "frida-${triple}.exe"
+          Invoke-WebRequest -Uri "${baseUrl}/frida-${fridaVer}-windows-x86_64.zip" -OutFile frida.zip
+          Expand-Archive -Path frida.zip -DestinationPath frida-extract -Force
+          Move-Item "frida-extract/frida-${fridaVer}-windows-x86_64/frida.exe" "frida-${triple}.exe"
+          Remove-Item -Recurse -Force frida.zip frida-extract
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
