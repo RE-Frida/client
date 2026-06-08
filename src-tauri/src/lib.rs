@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
-use tauri::State;
+use tauri::{Manager, State};
 use tokio::sync::{mpsc, oneshot, RwLock};
 
 use re_frida_protocol::*;
@@ -795,18 +795,19 @@ pub fn run() {
 
     let state = AppState::new();
 
-    // Connect WebSocket in background
-    let state_for_ws = state.clone();
-    tokio::spawn(async move {
-        connect_ws(state_for_ws).await;
-    });
-
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_process::init())
         .manage(state)
+        .setup(|app| {
+            let state = app.state::<AppState>().inner().clone();
+            tauri::async_runtime::spawn(async move {
+                connect_ws(state).await;
+            });
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             discover_devices,
             start_session,
