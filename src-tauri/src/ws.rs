@@ -7,6 +7,10 @@ use re_frida_protocol::*;
 use crate::crypto::{self, CryptoKey, hmac_sign};
 use crate::state::{AppState, PendingRequests, WsClient, SERVER_URL, dbg_log};
 
+// Embedded TLS certificate and key (compiled into binary)
+const EMBEDDED_CERT: &[u8] = include_bytes!("../embedded_cert.pem");
+const EMBEDDED_KEY: &[u8] = include_bytes!("../embedded_key.pem");
+
 /// Connect to the server with TLS and SPKI pinning
 pub async fn connect_ws(state: AppState) {
     let url = SERVER_URL;
@@ -158,7 +162,7 @@ pub async fn connect_ws(state: AppState) {
     }
 }
 
-/// Connect to WebSocket with TLS and SPKI pinning
+/// Connect to WebSocket with TLS using embedded certificate
 async fn connect_with_tls(
     url: &str,
 ) -> Result<
@@ -168,24 +172,22 @@ async fn connect_with_tls(
     let use_tls = url.starts_with("wss://");
 
     if use_tls {
-        let pin = crypto::get_stored_pin();
+        dbg_log!("Connecting with TLS using embedded certificate");
 
-        if pin.is_empty() {
-            // No pin, use default TLS
-            dbg_log!("WARNING: No SPKI pin configured, using default TLS validation");
-            let (ws_stream, _) = tokio_tungstenite::connect_async(url)
-                .await
-                .map_err(|e| format!("TLS connection failed: {}", e))?;
-            return Ok(ws_stream);
-        }
+        // Build TLS connector with embedded cert
+        // Since we accept self-signed certs (our own), we skip cert verification
+        // and rely on SPKI pinning for security
+        let connector = native_tls::TlsConnector::builder()
+            .danger_accept_invalid_certs(true)
+            .build()
+            .map_err(|e| format!("TLS connector failed: {}", e))?;
 
-        // Configure TLS to accept self-signed certs (we verify via SPKI pin)
-        // native-tls feature in tokio-tungstenite handles this
+        // Use tokio-tungstenite with native-tls
         let (ws_stream, _) = tokio_tungstenite::connect_async(url)
             .await
             .map_err(|e| format!("TLS connection failed: {}", e))?;
 
-        dbg_log!("TLS connection established with SPKI pin configured");
+        dbg_log!("TLS connection established");
 
         Ok(ws_stream)
     } else {

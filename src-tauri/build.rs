@@ -9,6 +9,10 @@ fn main() {
     let key_path = cert_dir.join("server_key.pem");
     let pin_path = Path::new("spki_pin.txt");
 
+    // Embedded cert paths (copied at build time)
+    let embedded_cert = Path::new("embedded_cert.pem");
+    let embedded_key = Path::new("embedded_key.pem");
+
     if !cert_path.exists() || !key_path.exists() {
         println!("cargo:warning=Generating self-signed TLS certificate...");
         fs::create_dir_all(cert_dir).expect("Failed to create certs directory");
@@ -35,13 +39,17 @@ fn main() {
         println!("cargo:warning=Certificate generated at {}", cert_path.display());
     }
 
+    // Copy certs to src-tauri for embedding
+    fs::copy(&cert_path, &embedded_cert).expect("Failed to copy cert for embedding");
+    fs::copy(&key_path, &embedded_key).expect("Failed to copy key for embedding");
+    println!("cargo:warning=Certs copied for embedding");
+
     // Extract SPKI pin from cert
     if !pin_path.exists() || cert_path.metadata().unwrap().modified().unwrap()
         > pin_path.metadata().unwrap().modified().unwrap()
     {
         println!("cargo:warning=Extracting SPKI pin from certificate...");
 
-        // openssl x509 -in cert.pem -pubkey -noout | openssl pkey -pubin -outform DER | openssl dgst -sha256 -binary | base64
         let pubkey = Command::new("openssl")
             .args(["x509", "-in", cert_path.to_str().unwrap(), "-pubkey", "-noout"])
             .output()
@@ -105,8 +113,11 @@ fn main() {
 
     // Tell cargo to rerun if cert or pin changes
     println!("cargo:rerun-if-changed={}", cert_path.display());
+    println!("cargo:rerun-if-changed={}", key_path.display());
     println!("cargo:rerun-if-changed={}", pin_path.display());
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=embedded_cert.pem");
+    println!("cargo:rerun-if-changed=embedded_key.pem");
 
     tauri_build::build();
 }
