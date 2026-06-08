@@ -112,43 +112,54 @@ impl AppState {
 }
 
 fn find_binary(name: &str) -> String {
-    let target = env!("TARGET");
-    let suffix = format!("-{}", target);
-
     #[cfg(target_os = "windows")]
     let ext = ".exe";
     #[cfg(not(target_os = "windows"))]
     let ext = "";
 
-    // 1. Check next to the executable (with target triple)
+    // Tauri sidecars use target triple suffix
+    let suffix = if cfg!(target_os = "windows") {
+        "-x86_64-pc-windows-msvc"
+    } else if cfg!(target_os = "linux") {
+        "-x86_64-unknown-linux-gnu"
+    } else if cfg!(target_os = "macos") {
+        "-x86_64-apple-darwin"
+    } else {
+        ""
+    };
+
+    let name_with_suffix = format!("{}{}{}", name, suffix, ext);
+    let name_plain = format!("{}{}", name, ext);
+
+    // 1. Check next to the executable (with target triple - Tauri sidecar)
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
-            let bundled = dir.join("tools").join(format!("{}{}{}", name, suffix, ext));
+            let bundled = dir.join("tools").join(&name_with_suffix);
             if bundled.exists() {
                 return bundled.to_string_lossy().to_string();
             }
-            let bundled = dir.join(format!("{}{}{}", name, suffix, ext));
+            let bundled = dir.join(&name_with_suffix);
             if bundled.exists() {
                 return bundled.to_string_lossy().to_string();
             }
             // Without target triple
-            let bundled = dir.join("tools").join(format!("{}{}", name, ext));
+            let bundled = dir.join("tools").join(&name_plain);
             if bundled.exists() {
                 return bundled.to_string_lossy().to_string();
             }
-            let bundled = dir.join(format!("{}{}", name, ext));
+            let bundled = dir.join(&name_plain);
             if bundled.exists() {
                 return bundled.to_string_lossy().to_string();
             }
         }
     }
     // 2. Check current working directory
-    let cwd = std::path::PathBuf::from("tools").join(format!("{}{}", name, ext));
+    let cwd = std::path::PathBuf::from("tools").join(&name_plain);
     if cwd.exists() {
         return cwd.to_string_lossy().to_string();
     }
     // 3. Fall back to system PATH
-    format!("{}{}", name, ext)
+    name_plain
 }
 
 // ─── ADB Commands ───────────────────────────────────────────────
