@@ -306,14 +306,14 @@ async fn execute_script(
 async fn push_gadget(
     state: State<'_, AppState>,
     device_id: String,
-    gadgetPath: String,
+    gadget_path: String,
 ) -> Result<String, String> {
     dbg_log!("push_gadget to {}", device_id);
     let output = Command::new(&state.adb_path)
         .arg("-s")
         .arg(&device_id)
         .arg("push")
-        .arg(&gadgetPath)
+        .arg(&gadget_path)
         .arg("/data/local/tmp/libfrida-gadget.so")
         .output()
         .map_err(|e| format!("Push failed: {}", e))?;
