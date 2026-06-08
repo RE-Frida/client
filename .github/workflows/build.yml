@@ -120,9 +120,9 @@ jobs:
           $fridaVer = $fridaTag -replace '^v',''
           Write-Host "Downloading frida-inject v${fridaVer}"
           $baseUrl = "https://github.com/frida/frida/releases/download/${fridaTag}"
-          & curl.exe -sL -o fi.xz "${baseUrl}/frida-inject-${fridaVer}-windows-x86_64.xz"
-          & xz -df fi.xz
-          Rename-Item frida-inject "frida-inject-${triple}.exe"
+          & curl.exe -sL -o "frida-inject.exe.xz" "${baseUrl}/frida-inject-${fridaVer}-windows-x86_64.exe.xz"
+          & xz -df "frida-inject.exe.xz"
+          Rename-Item "frida-inject.exe" "frida-inject-${triple}.exe"
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
