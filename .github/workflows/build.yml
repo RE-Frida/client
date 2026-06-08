@@ -138,11 +138,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Rename binary
+        shell: bash
+        run: |
+          EXT=""
+          if [[ "${{ runner.os }}" == "Windows" ]]; then EXT=".exe"; fi
+          mv target/${{ matrix.target }}/release/re-frida-tauri${EXT} \
+             target/${{ matrix.target }}/release/${{ matrix.artifact }}${EXT}
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: target/${{ matrix.target }}/release/re-frida-tauri
+          path: target/${{ matrix.target }}/release/${{ matrix.artifact }}*
 
   release:
     name: Release
