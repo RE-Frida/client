@@ -114,9 +114,9 @@ jobs:
           Copy-Item platform-tools/AdbWinApi.dll ./AdbWinApi.dll -ErrorAction SilentlyContinue
           Copy-Item platform-tools/AdbWinUsbApi.dll ./AdbWinUsbApi.dll -ErrorAction SilentlyContinue
           Remove-Item -Recurse -Force platform-tools, pt.zip
-          # frida CLI
-          $resp = Invoke-WebRequest -Uri "https://github.com/frida/frida/releases/latest" -MaximumRedirection 0 -ErrorAction SilentlyContinue -SkipHttpErrorCheck
-          $fridaTag = ($resp.Headers.Location -split '/')[-1]
+          # frida-inject
+          $apiResp = Invoke-RestMethod -Uri "https://api.github.com/repos/frida/frida/releases/latest"
+          $fridaTag = $apiResp.tag_name
           $fridaVer = $fridaTag -replace '^v',''
           Write-Host "Downloading frida-inject v${fridaVer}"
           $baseUrl = "https://github.com/frida/frida/releases/download/${fridaTag}"
