@@ -13,3 +13,6 @@ chrono = "0.4"
 
 [profile.release]
 strip = true
+
+[patch.crates-io]
+glib = { git = "https://github.com/gtk-rs/gtk-rs-core.git", tag = "0.20.0" }
