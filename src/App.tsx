@@ -9,7 +9,6 @@ import type { TabId } from "@/types";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>("dashboard");
-  const [connected] = useState(false);
 
   const addLog = useCallback((_msg: string) => {
     // logs are managed per-page now
@@ -37,7 +36,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
-      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} connected={connected} />
+      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
       <main className="flex-1 overflow-auto">
         {renderContent()}
       </main>

@@ -1,7 +1,7 @@
 [package]
 name = "re-frida-tauri"
-version = "0.1.6"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [lib]
 name = "re_frida_tauri_lib"
@@ -16,14 +16,16 @@ tauri-plugin-shell = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-process = "2"
+re-frida-protocol = { path = "../protocol" }
 
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+
 tokio = { version = "1", features = ["full"] }
 anyhow = "1"
 log = "0.4"
 env_logger = "0.11"
-chrono = "0.4"
 
 # WebSocket client
 tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
@@ -34,6 +36,7 @@ native-tls = "0.2"
 sha2 = "0.10"
 base64 = "0.22"
 hex = "0.4"
+uuid = { version = "1", features = ["v4"] }
 
 # HTTP
 reqwest = { version = "0.12", features = ["rustls-tls"], default-features = false }
@@ -48,6 +51,3 @@ regex = "1"
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 debug = []
-
-[profile.release]
-strip = true

@@ -6,23 +6,26 @@ export interface DeviceInfo {
 
 export interface AppConfig {
   theme: string;
-  server_url: string;
   frida_port: number;
   custom_package: string;
   advanced_mode: boolean;
 }
 
-export interface ScriptItem {
+export interface ScriptData {
   id: string;
   name: string;
   description: string;
   author: string;
-  category: string;
+  code: string;
   downloads: number;
   upvotes: number;
   downvotes: number;
   user_vote: boolean | null;
-  code: string;
+  category: string;
+  game: string;
+  game_version: string;
+  tags: string[];
+  created_at: string;
 }
 
 export interface AuthState {

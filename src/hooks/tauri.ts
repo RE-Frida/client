@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { DeviceInfo, AppConfig, AuthState } from "@/types";
+import type { DeviceInfo, AppConfig, AuthState, ScriptData } from "@/types";
 
 // ─── ADB ────────────────────────────────────────────────────────
 
@@ -60,8 +60,39 @@ export async function getAuthState(): Promise<AuthState> {
   return invoke("get_auth_state");
 }
 
+export async function startLogin(): Promise<string> {
+  return invoke("start_login");
+}
+
 export async function logout(): Promise<void> {
   return invoke("logout");
+}
+
+// ─── Marketplace ─────────────────────────────────────────────────
+
+export async function listScripts(
+  search?: string,
+  category?: string,
+  sort?: string
+): Promise<ScriptData[]> {
+  return invoke("list_scripts", { search, category, sort });
+}
+
+export async function voteScript(
+  scriptId: string,
+  upvote: boolean
+): Promise<void> {
+  return invoke("vote_script", { scriptId, upvote });
+}
+
+export async function downloadScript(scriptId: string): Promise<void> {
+  return invoke("download_script", { scriptId });
+}
+
+// ─── Connection ──────────────────────────────────────────────────
+
+export async function isConnected(): Promise<boolean> {
+  return invoke("is_connected");
 }
 
 // ─── App ─────────────────────────────────────────────────────────

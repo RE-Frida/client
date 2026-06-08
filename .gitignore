@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 src-tauri/target
+src-tauri/tools/*.exe
+src-tauri/tools/adb-*
+src-tauri/tools/frida-inject-*
+src-tauri/gen
+target
 
 # Editor directories and files
 .vscode/*

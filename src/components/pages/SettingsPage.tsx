@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-  Moon, Sun, Monitor, Server, Wifi, Package, Save,
+  Moon, Sun, Monitor, Wifi, Package, Save,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,6 @@ interface SettingsPageProps {
 export function SettingsPage({ onLog }: SettingsPageProps) {
   const [config, setConfig] = useState<AppConfig>({
     theme: "dark",
-    server_url: "",
     frida_port: 27042,
     custom_package: "",
     advanced_mode: false,
@@ -82,30 +81,6 @@ export function SettingsPage({ onLog }: SettingsPageProps) {
                   </button>
                 );
               })}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Server className="h-4 w-4" />
-              Server
-            </CardTitle>
-            <CardDescription>Backend connection settings</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">
-                Server URL
-              </label>
-              <Input
-                value={config.server_url}
-                onChange={(e) =>
-                  setConfig({ ...config, server_url: e.target.value })
-                }
-                placeholder="wss://refrida.rawnullbyte.com"
-              />
             </div>
           </CardContent>
         </Card>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Search, Download, ThumbsUp, ThumbsDown, User, ExternalLink,
 } from "lucide-react";
@@ -7,62 +7,57 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { ScriptItem } from "@/types";
-
-const MOCK_SCRIPTS: ScriptItem[] = [
-  {
-    id: "1",
-    name: "SSL Pinning Bypass",
-    description: "Bypass SSL certificate pinning on Android applications",
-    author: "RE:Frida Team",
-    category: "Security",
-    downloads: 15420,
-    upvotes: 342,
-    downvotes: 12,
-    user_vote: null,
-    code: "// SSL Pinning Bypass\nJava.perform(function() {\n  var TrustManager = Java.registerClass({\n    name: 'com.custom.TrustManager',\n    implements: [Java.use('javax.net.ssl.X509TrustManager')],\n    methods: {\n      checkClientTrusted: function(chain, authType) {},\n      checkServerTrusted: function(chain, authType) {},\n      getAcceptedIssuers: function() { return []; }\n    }\n  });\n});",
-  },
-  {
-    id: "2",
-    name: "Root Detection Bypass",
-    description: "Bypass common root detection methods",
-    author: "SecurityX",
-    category: "Anti-Fraud",
-    downloads: 8930,
-    upvotes: 189,
-    downvotes: 5,
-    user_vote: null,
-    code: "// Root Detection Bypass\nJava.perform(function() {\n  var RootBeer = Java.use('com.scottyab.rootbeer.RootBeer');\n  RootBeer.isRooted.implementation = function() {\n    return false;\n  };\n});",
-  },
-  {
-    id: "3",
-    name: "Frida Logger",
-    description: "Log all Java method calls in real-time",
-    author: "DebugMaster",
-    category: "Debugging",
-    downloads: 6210,
-    upvotes: 134,
-    downvotes: 8,
-    user_vote: null,
-    code: "// Method Logger\nJava.perform(function() {\n  var Activity = Java.use('android.app.Activity');\n  Activity.onResume.implementation = function() {\n    console.log('[*] onResume: ' + this.getClass().getName());\n    this.onResume();\n  };\n});",
-  },
-];
+import { listScripts, voteScript, downloadScript, getAuthState } from "@/hooks/tauri";
+import type { ScriptData, AuthState } from "@/types";
 
 interface MarketplaceProps {
   onUseScript: (code: string) => void;
 }
 
 export function Marketplace({ onUseScript }: MarketplaceProps) {
-  const [scripts] = useState<ScriptItem[]>(MOCK_SCRIPTS);
+  const [scripts, setScripts] = useState<ScriptData[]>([]);
   const [search, setSearch] = useState("");
-  const [selectedScript, setSelectedScript] = useState<ScriptItem | null>(null);
+  const [selectedScript, setSelectedScript] = useState<ScriptData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [auth, setAuth] = useState<AuthState | null>(null);
 
-  const filtered = scripts.filter(
-    (s) =>
-      !search ||
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.description.toLowerCase().includes(search.toLowerCase())
-  );
+  const fetchScripts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await listScripts(search || undefined);
+      setScripts(result);
+    } catch (e) {
+      console.error("Failed to fetch scripts:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [search]);
+
+  useEffect(() => {
+    getAuthState().then(setAuth).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetchScripts();
+  }, [fetchScripts]);
+
+  const handleVote = async (scriptId: string, upvote: boolean) => {
+    if (!auth?.authenticated) return;
+    try {
+      await voteScript(scriptId, upvote);
+      await fetchScripts();
+    } catch (e) {
+      console.error("Vote failed:", e);
+    }
+  };
+
+  const handleDownload = async (script: ScriptData) => {
+    try {
+      await downloadScript(script.id);
+    } catch (e) {
+      console.error("Download failed:", e);
+    }
+  };
 
   return (
     <div className="flex h-full flex-col gap-4 p-4">
@@ -87,51 +82,69 @@ export function Marketplace({ onUseScript }: MarketplaceProps) {
         />
       </div>
 
+      {!auth?.authenticated && (
+        <Card className="border-warning">
+          <CardContent className="py-3 text-sm text-muted-foreground">
+            Login with Discord to browse and vote on scripts
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid flex-1 grid-cols-3 gap-4">
         <ScrollArea className="col-span-2">
           <div className="space-y-3 pr-4">
-            {filtered.map((script) => (
-              <Card
-                key={script.id}
-                className={
-                  "cursor-pointer transition-colors hover:border-primary/50 " +
-                  (selectedScript?.id === script.id ? "border-primary" : "")
-                }
-                onClick={() => setSelectedScript(script)}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-base">{script.name}</CardTitle>
-                      <CardDescription className="mt-1">
-                        {script.description}
-                      </CardDescription>
+            {loading ? (
+              <div className="flex items-center justify-center py-8 text-muted-foreground">
+                Loading scripts...
+              </div>
+            ) : scripts.length === 0 ? (
+              <div className="flex items-center justify-center py-8 text-muted-foreground">
+                No scripts found
+              </div>
+            ) : (
+              scripts.map((script) => (
+                <Card
+                  key={script.id}
+                  className={
+                    "cursor-pointer transition-colors hover:border-primary/50 " +
+                    (selectedScript?.id === script.id ? "border-primary" : "")
+                  }
+                  onClick={() => setSelectedScript(script)}
+                >
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <CardTitle className="text-base">{script.name}</CardTitle>
+                        <CardDescription className="mt-1">
+                          {script.description}
+                        </CardDescription>
+                      </div>
+                      <Badge variant="secondary">{script.category}</Badge>
                     </div>
-                    <Badge variant="secondary">{script.category}</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <User className="h-3 w-3" />
-                      {script.author}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Download className="h-3 w-3" />
-                      {script.downloads.toLocaleString()}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <ThumbsUp className="h-3 w-3" />
-                      {script.upvotes}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <ThumbsDown className="h-3 w-3" />
-                      {script.downvotes}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <User className="h-3 w-3" />
+                        {script.author}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Download className="h-3 w-3" />
+                        {script.downloads.toLocaleString()}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <ThumbsUp className="h-3 w-3" />
+                        {script.upvotes}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <ThumbsDown className="h-3 w-3" />
+                        {script.downvotes}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </div>
         </ScrollArea>
 
@@ -153,16 +166,31 @@ export function Marketplace({ onUseScript }: MarketplaceProps) {
                 <div className="flex gap-2">
                   <Button
                     className="flex-1"
-                    onClick={() => onUseScript(selectedScript.code)}
+                    onClick={() => {
+                      handleDownload(selectedScript);
+                      onUseScript(selectedScript.code);
+                    }}
                   >
                     Use Script
                   </Button>
-                  <Button variant="outline" size="icon">
-                    <ThumbsUp className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="icon">
-                    <ThumbsDown className="h-4 w-4" />
-                  </Button>
+                  {auth?.authenticated && (
+                    <>
+                      <Button
+                        variant={selectedScript.user_vote === true ? "default" : "outline"}
+                        size="icon"
+                        onClick={() => handleVote(selectedScript.id, true)}
+                      >
+                        <ThumbsUp className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant={selectedScript.user_vote === false ? "destructive" : "outline"}
+                        size="icon"
+                        onClick={() => handleVote(selectedScript.id, false)}
+                      >
+                        <ThumbsDown className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
                 </div>
               </>
             ) : (

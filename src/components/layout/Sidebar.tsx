@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   LayoutDashboard,
   Store,
@@ -7,14 +8,16 @@ import {
   Smartphone,
   Cpu,
   Zap,
+  LogIn,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { TabId } from "@/types";
+import { getAuthState, startLogin, logout, isConnected } from "@/hooks/tauri";
+import type { TabId, AuthState } from "@/types";
 
 interface SidebarProps {
   activeTab: TabId;
   onTabChange: (tab: TabId) => void;
-  connected: boolean;
 }
 
 const navItems: { id: TabId; label: string; icon: React.ElementType }[] = [
@@ -25,7 +28,55 @@ const navItems: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
-export function Sidebar({ activeTab, onTabChange, connected }: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
+  const [auth, setAuth] = useState<AuthState>({
+    authenticated: false,
+    username: null,
+    avatar_url: null,
+    token: null,
+  });
+  const [connected, setConnected] = useState(false);
+  const [loggingIn, setLoggingIn] = useState(false);
+
+  useEffect(() => {
+    const poll = setInterval(() => {
+      getAuthState().then(setAuth).catch(() => {});
+      isConnected().then(setConnected).catch(() => {});
+    }, 2000);
+
+    getAuthState().then(setAuth).catch(() => {});
+    isConnected().then(setConnected).catch(() => {});
+
+    return () => clearInterval(poll);
+  }, []);
+
+  const handleLogin = async () => {
+    setLoggingIn(true);
+    try {
+      await startLogin();
+      const state = await getAuthState();
+      setAuth(state);
+    } catch (e) {
+      console.error("Login failed:", e);
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setAuth({
+        authenticated: false,
+        username: null,
+        avatar_url: null,
+        token: null,
+      });
+    } catch (e) {
+      console.error("Logout failed:", e);
+    }
+  };
+
   return (
     <aside className="flex h-full w-56 flex-col border-r border-sidebar-border bg-sidebar">
       {/* Logo */}
@@ -76,6 +127,42 @@ export function Sidebar({ activeTab, onTabChange, connected }: SidebarProps) {
           );
         })}
       </nav>
+
+      {/* Auth Section */}
+      <div className="border-t border-sidebar-border px-4 py-3">
+        {auth.authenticated ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              {auth.avatar_url && (
+                <img
+                  src={auth.avatar_url}
+                  alt="avatar"
+                  className="h-6 w-6 rounded-full"
+                />
+              )}
+              <span className="text-xs font-medium text-sidebar-foreground truncate">
+                {auth.username}
+              </span>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+            >
+              <LogOut className="h-3 w-3" />
+              Logout
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleLogin}
+            disabled={loggingIn || !connected}
+            className="flex w-full items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <LogIn className="h-3 w-3" />
+            {loggingIn ? "Logging in..." : "Login with Discord"}
+          </button>
+        )}
+      </div>
 
       {/* Device Indicator */}
       <div className="border-t border-sidebar-border px-4 py-3">
