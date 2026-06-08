@@ -90,16 +90,15 @@ jobs:
           cp platform-tools/adb "./adb-${TRIPLE}"
           chmod +x "./adb-${TRIPLE}"
           rm -rf platform-tools pt.zip
-          # frida CLI
+          # frida-inject
           FRIDA_TAG=$(curl -sLI -o /dev/null -w '%{url_effective}' "https://github.com/frida/frida/releases/latest" | xargs basename)
           FRIDA_VER="${FRIDA_TAG#v}"
-          echo "Downloading frida v${FRIDA_VER}"
+          echo "Downloading frida-inject v${FRIDA_VER}"
           BASE_URL="https://github.com/frida/frida/releases/download/${FRIDA_TAG}"
-          curl -sL "${BASE_URL}/frida-${FRIDA_VER}-linux-x86_64.tar.xz" -o frida.tar.xz
-          tar xf frida.tar.xz --strip-components=0
-          mv frida-${FRIDA_VER}-linux-x86_64/frida "frida-${TRIPLE}"
-          rm -rf frida.tar.xz frida-${FRIDA_VER}-linux-x86_64
-          chmod +x "frida-${TRIPLE}"
+          curl -sL "${BASE_URL}/frida-inject-${FRIDA_VER}-linux-x86_64.xz" -o frida-inject.xz
+          xz -df frida-inject.xz
+          mv frida-inject "frida-inject-${TRIPLE}"
+          chmod +x "frida-inject-${TRIPLE}"
 
       - name: Download ADB + frida (Windows)
         if: runner.os == 'Windows'
@@ -119,12 +118,11 @@ jobs:
           $resp = Invoke-WebRequest -Uri "https://github.com/frida/frida/releases/latest" -MaximumRedirection 0 -ErrorAction SilentlyContinue -SkipHttpErrorCheck
           $fridaTag = ($resp.Headers.Location -split '/')[-1]
           $fridaVer = $fridaTag -replace '^v',''
-          Write-Host "Downloading frida v${fridaVer}"
+          Write-Host "Downloading frida-inject v${fridaVer}"
           $baseUrl = "https://github.com/frida/frida/releases/download/${fridaTag}"
-          Invoke-WebRequest -Uri "${baseUrl}/frida-${fridaVer}-windows-x86_64.zip" -OutFile frida.zip
-          Expand-Archive -Path frida.zip -DestinationPath frida-extract -Force
-          Move-Item "frida-extract/frida-${fridaVer}-windows-x86_64/frida.exe" "frida-${triple}.exe"
-          Remove-Item -Recurse -Force frida.zip frida-extract
+          Invoke-WebRequest -Uri "${baseUrl}/frida-inject-${fridaVer}-windows-x86_64.xz" -OutFile fi.xz
+          & xz -df fi.xz
+          Rename-Item frida-inject "frida-inject-${triple}.exe"
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
