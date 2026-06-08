@@ -127,7 +127,7 @@ jobs:
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         with:
-          args: --target ${{ matrix.target }} ${{ matrix.features }} --bundles none
+          args: --target ${{ matrix.target }} ${{ matrix.features }} --no-bundle
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
