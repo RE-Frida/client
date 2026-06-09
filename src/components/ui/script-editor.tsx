@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
 import { oneDark } from "@codemirror/theme-one-dark";
@@ -24,6 +24,7 @@ import { keymap, EditorView } from "@codemirror/view";
 interface ScriptEditorProps {
   value: string;
   onChange: (value: string) => void;
+  onSave?: () => void;
   height?: string;
 }
 
@@ -69,8 +70,21 @@ function fridaCompletionSource(context: any) {
   };
 }
 
-export function ScriptEditor({ value, onChange, height = "100%" }: ScriptEditorProps) {
-  const isDark = typeof document !== "undefined" && !document.documentElement.hasAttribute("data-theme");
+export function ScriptEditor({ value, onChange, onSave, height = "100%" }: ScriptEditorProps) {
+  const theme = typeof document !== "undefined" ? document.documentElement.getAttribute("data-theme") : null;
+  const isDark = theme !== "light";
+
+  useEffect(() => {
+    if (!onSave) return;
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        onSave();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onSave]);
 
   const extensions = useMemo(() => [
     javascript(),

@@ -463,7 +463,7 @@ export function EditorPage({ selectedDevice, onDeviceChange, projectId, onProjec
 
           <div className="flex-1 overflow-hidden">
             {selectedFile || workspacePath ? (
-              <ScriptEditor value={code} onChange={setCode} />
+              <ScriptEditor value={code} onChange={setCode} onSave={saveFile} />
             ) : (
               <div className="flex h-full items-center justify-center text-muted-foreground">
                 <div className="text-center">

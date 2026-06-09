@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Search, Download, User, Plus, Trash2, Package,
-  X, Tag, FileCode, Loader2, CheckCircle2, ChevronDown, ChevronUp,
-  Image, AlertCircle,
+  X, Tag, FileCode, Loader2, CheckCircle2, ChevronDown,
+  Image, AlertCircle, ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,19 +25,15 @@ interface MarketplaceProps {
 
 const CATEGORIES = ["All", "Tools", "Games", "Security", "Utilities", "Other"];
 
+function hasValidIcon(project: ProjectData): boolean {
+  return !!project.icon && project.icon.startsWith("data:");
+}
+
 export function Marketplace({ onUseProject }: MarketplaceProps) {
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [projectFiles, setProjectFiles] = useState<string[]>([]);
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [fileContent, setFileContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadingFiles, setLoadingFiles] = useState(false);
-  const [loadingContent, setLoadingContent] = useState(false);
-  const [downloading, setDownloading] = useState<string | null>(null);
-  const [updating, setUpdating] = useState<string | null>(null);
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [createName, setCreateName] = useState("");
@@ -50,6 +46,20 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
   const [installed, setInstalled] = useState<Set<string>>(new Set());
   const [showInstalled, setShowInstalled] = useState(false);
   const [diffMap, setDiffMap] = useState<Map<string, boolean>>(new Map());
+
+  // Detail modal state
+  const [detailProject, setDetailProject] = useState<ProjectData | null>(null);
+  const [detailFiles, setDetailFiles] = useState<string[]>([]);
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [fileContent, setFileContent] = useState<string | null>(null);
+  const [loadingFiles, setLoadingFiles] = useState(false);
+  const [loadingContent, setLoadingContent] = useState(false);
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const [updating, setUpdating] = useState<string | null>(null);
+
+  // Delete confirmation
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ProjectData | null>(null);
 
   const checkInstalled = useCallback(async (projects: ProjectData[]) => {
     const result = new Set<string>();
@@ -94,23 +104,15 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
     return matchesSearch && matchesCategory && matchesInstalled;
   });
 
-  const handleToggleExpand = async (project: ProjectData) => {
-    if (expandedId === project.id) {
-      setExpandedId(null);
-      setProjectFiles([]);
-      setSelectedFile(null);
-      setFileContent(null);
-      return;
-    }
-    setExpandedId(project.id);
+  const openDetail = async (project: ProjectData) => {
+    setDetailProject(project);
     setSelectedFile(null);
     setFileContent(null);
     setLoadingFiles(true);
+    setDetailFiles([]);
     try {
       const files = await listProjectFiles(project.id);
-      setProjectFiles(files);
-
-      // Check if installed and check diff
+      setDetailFiles(files);
       if (installed.has(project.id)) {
         try {
           const path = await getProjectInstallPath(project.id);
@@ -123,19 +125,26 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
       }
     } catch (e) {
       console.error("Failed to list project files:", e);
-      setProjectFiles([]);
+      setDetailFiles([]);
     } finally {
       setLoadingFiles(false);
     }
   };
 
+  const closeDetail = () => {
+    setDetailProject(null);
+    setDetailFiles([]);
+    setSelectedFile(null);
+    setFileContent(null);
+  };
+
   const handleSelectFile = async (path: string) => {
-    if (!expandedId) return;
+    if (!detailProject) return;
     setSelectedFile(path);
     setFileContent(null);
     setLoadingContent(true);
     try {
-      const content = await getProjectFile(expandedId, path);
+      const content = await getProjectFile(detailProject.id, path);
       setFileContent(content);
     } catch (e) {
       console.error("Failed to get file content:", e);
@@ -175,18 +184,24 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
     onUseProject(project.id);
   };
 
-  const handleDelete = async (project: ProjectData) => {
+  const handleDeleteClick = (project: ProjectData) => {
+    setDeleteTarget(project);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
     try {
-      await deleteProject(project.id);
-      if (expandedId === project.id) {
-        setExpandedId(null);
-        setProjectFiles([]);
-        setSelectedFile(null);
-        setFileContent(null);
+      await deleteProject(deleteTarget.id);
+      if (detailProject?.id === deleteTarget.id) {
+        closeDetail();
       }
       await fetchProjects();
     } catch (e) {
       console.error("Failed to delete project:", e);
+    } finally {
+      setShowDeleteConfirm(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -369,194 +384,210 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
               No projects found
             </div>
           ) : (
-            filtered.map((project) => {
-              const isExpanded = expandedId === project.id;
-              return (
-                <div key={project.id}>
-                  <Card
-                    className={
-                      "cursor-pointer transition-colors hover:border-primary/50 " +
-                      (isExpanded ? "border-primary rounded-b-none" : "")
-                    }
-                    onClick={() => handleToggleExpand(project)}
-                  >
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted overflow-hidden">
-                            {project.icon ? (
-                              <img
-                                src={project.icon}
-                                alt={project.name}
-                                className="h-full w-full object-cover"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).style.display = "none";
-                                  (e.target as HTMLImageElement).nextElementSibling?.classList.remove("hidden");
-                                }}
-                              />
-                            ) : null}
-                            <span className={project.icon ? "hidden" : "text-lg"}>📦</span>
-                          </div>
-                          <div>
-                            <CardTitle className="text-base">{project.name}</CardTitle>
-                            <CardDescription className="mt-0.5 line-clamp-2">
-                              {project.description}
-                            </CardDescription>
-                          </div>
-                        </div>
-                        <Badge variant="secondary">{project.category}</Badge>
+            filtered.map((project) => (
+              <Card
+                key={project.id}
+                className="cursor-pointer transition-colors hover:border-primary/50"
+                onClick={() => openDetail(project)}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted overflow-hidden shrink-0">
+                        {hasValidIcon(project) ? (
+                          <img
+                            src={project.icon}
+                            alt={project.name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <Package className="h-5 w-5 text-muted-foreground" />
+                        )}
                       </div>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            {project.author}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Download className="h-3 w-3" />
-                            {project.downloads.toLocaleString()}
-                          </span>
-                          {installed.has(project.id) && (
-                            <Badge variant="secondary" className="text-[10px] gap-1">
-                              <CheckCircle2 className="h-2.5 w-2.5" />
-                              Installed
-                            </Badge>
-                          )}
-                          <div className="flex gap-1">
-                            {project.tags.slice(0, 3).map((tag) => (
-                              <Badge key={tag} variant="outline" className="text-[10px]">
-                                {tag}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {isExpanded ? (
-                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </div>
+                      <div>
+                        <CardTitle className="text-base">{project.name}</CardTitle>
+                        <CardDescription className="mt-0.5 line-clamp-2">
+                          {project.description}
+                        </CardDescription>
                       </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Expanded detail panel */}
-                  {isExpanded && (
-                    <Card className="border-primary/50 rounded-t-none border-t-0">
-                      <CardContent className="pt-4">
-                        <div className="flex gap-6">
-                          {/* Icon */}
-                          {project.icon && (
-                            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-muted overflow-hidden">
-                              <img
-                                src={project.icon}
-                                alt={project.name}
-                                className="h-full w-full object-cover"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).style.display = "none";
-                                }}
-                              />
-                            </div>
-                          )}
-
-                          {/* Details */}
-                          <div className="flex flex-1 flex-col gap-3">
-                            <p className="text-sm text-muted-foreground">{project.description}</p>
-
-                            {/* Tags */}
-                            {project.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-1">
-                                {project.tags.map((tag) => (
-                                  <Badge key={tag} variant="outline" className="text-xs">
-                                    {tag}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
-
-                            {/* Action buttons */}
-                            <div className="flex items-center gap-2">
-                              {renderProjectActions(project)}
-                              {isOwner(project) && (
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => handleDelete(project)}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Files section */}
-                        <div className="mt-4">
-                          <h4 className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                            <FileCode className="h-3 w-3" />
-                            Files
-                          </h4>
-                          {loadingFiles ? (
-                            <div className="flex items-center justify-center py-4 text-muted-foreground">
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            </div>
-                          ) : (
-                            <div className="flex gap-4">
-                              <div className="w-48 shrink-0 space-y-0.5">
-                                {projectFiles.map((file) => (
-                                  <button
-                                    key={file}
-                                    className={
-                                      "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-left transition-colors " +
-                                      (selectedFile === file
-                                        ? "bg-primary/10 text-primary"
-                                        : "hover:bg-muted text-muted-foreground hover:text-foreground")
-                                    }
-                                    onClick={() => handleSelectFile(file)}
-                                  >
-                                    <FileCode className="h-3 w-3 shrink-0" />
-                                    <span className="truncate">{file}</span>
-                                  </button>
-                                ))}
-                                {projectFiles.length === 0 && (
-                                  <p className="py-2 text-center text-xs text-muted-foreground">
-                                    No files
-                                  </p>
-                                )}
-                              </div>
-
-                              {/* File preview */}
-                              {selectedFile && (
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-xs font-medium text-muted-foreground mb-1">
-                                    {selectedFile}
-                                  </div>
-                                  {loadingContent ? (
-                                    <div className="flex items-center justify-center py-4 text-muted-foreground">
-                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    </div>
-                                  ) : (
-                                    <pre className="max-h-60 overflow-auto rounded bg-muted p-3 text-xs font-mono whitespace-pre-wrap">
-                                      {fileContent}
-                                    </pre>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-              );
-            })
+                    </div>
+                    <Badge variant="secondary">{project.category}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <User className="h-3 w-3" />
+                        {project.author}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Download className="h-3 w-3" />
+                        {project.downloads.toLocaleString()}
+                      </span>
+                      {installed.has(project.id) && (
+                        <Badge variant="secondary" className="text-[10px] gap-1">
+                          <CheckCircle2 className="h-2.5 w-2.5" />
+                          Installed
+                        </Badge>
+                      )}
+                      <div className="flex gap-1">
+                        {project.tags.slice(0, 3).map((tag) => (
+                          <Badge key={tag} variant="outline" className="text-[10px]">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))
           )}
         </div>
       </ScrollArea>
+
+      {/* Project Detail Modal */}
+      {detailProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="w-full max-w-3xl max-h-[90vh] flex flex-col mx-4">
+            <CardHeader className="shrink-0">
+              <div className="flex items-center justify-between">
+                <Button variant="ghost" size="sm" onClick={closeDetail}>
+                  <ArrowLeft className="mr-1.5 h-4 w-4" />
+                  Back
+                </Button>
+                {isOwner(detailProject) && (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => handleDeleteClick(detailProject)}
+                  >
+                    <Trash2 className="mr-1.5 h-3 w-3" />
+                    Delete
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <ScrollArea className="flex-1 px-6 pb-6">
+              <div className="flex gap-6 mb-6">
+                {hasValidIcon(detailProject) && (
+                  <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-muted overflow-hidden">
+                    <img
+                      src={detailProject.icon}
+                      alt={detailProject.name}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                )}
+                <div className="flex flex-1 flex-col gap-2">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h2 className="text-xl font-bold">{detailProject.name}</h2>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                        <User className="h-3 w-3" />
+                        {detailProject.author}
+                      </p>
+                    </div>
+                    <Badge variant="secondary">{detailProject.category}</Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{detailProject.description}</p>
+                  {detailProject.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {detailProject.tags.map((tag) => (
+                        <Badge key={tag} variant="outline" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3 mt-1">
+                    {renderProjectActions(detailProject)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Files */}
+              <div>
+                <h3 className="text-sm font-medium mb-2 flex items-center gap-1.5">
+                  <FileCode className="h-4 w-4" />
+                  Files
+                </h3>
+                {loadingFiles ? (
+                  <div className="flex items-center justify-center py-8 text-muted-foreground">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  </div>
+                ) : (
+                  <div className="flex gap-4">
+                    <div className="w-48 shrink-0 space-y-0.5">
+                      {detailFiles.map((file) => (
+                        <button
+                          key={file}
+                          className={
+                            "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-left transition-colors " +
+                            (selectedFile === file
+                              ? "bg-primary/10 text-primary"
+                              : "hover:bg-muted text-muted-foreground hover:text-foreground")
+                          }
+                          onClick={() => handleSelectFile(file)}
+                        >
+                          <FileCode className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{file}</span>
+                        </button>
+                      ))}
+                      {detailFiles.length === 0 && (
+                        <p className="py-2 text-center text-xs text-muted-foreground">
+                          No files
+                        </p>
+                      )}
+                    </div>
+                    {selectedFile && (
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium text-muted-foreground mb-1">
+                          {selectedFile}
+                        </div>
+                        {loadingContent ? (
+                          <div className="flex items-center justify-center py-4 text-muted-foreground">
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          </div>
+                        ) : (
+                          <pre className="max-h-80 overflow-auto rounded bg-muted p-3 text-xs font-mono whitespace-pre-wrap">
+                            {fileContent}
+                          </pre>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </Card>
+        </div>
+      )}
+
+      {/* Delete Confirmation */}
+      {showDeleteConfirm && deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="w-full max-w-sm mx-4">
+            <CardHeader>
+              <CardTitle className="text-lg">Delete Project</CardTitle>
+              <CardDescription>
+                Are you sure you want to delete "{deleteTarget.name}"? This action cannot be undone.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => { setShowDeleteConfirm(false); setDeleteTarget(null); }}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDeleteConfirm}>
+                <Trash2 className="mr-1.5 h-4 w-4" />
+                Delete
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Create Dialog */}
       {showCreateDialog && (

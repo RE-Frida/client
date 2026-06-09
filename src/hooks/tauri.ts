@@ -156,6 +156,7 @@ export async function readWorkspaceFiles(dirPath: string): Promise<WorkspaceFile
         files.push({ name: entry.name, path: relPath, isDir: true });
         await scan(fullPath, relPath);
       } else {
+        if (isBinaryFile(entry.name)) continue;
         files.push({ name: entry.name, path: relPath, isDir: false });
       }
     }
@@ -198,6 +199,22 @@ export async function saveWorkspaceConfig(dirPath: string, config: WorkspaceConf
   await writeTextFile(configPath, JSON.stringify(config, null, 2));
 }
 
+const BINARY_EXTENSIONS = new Set([
+  "png", "jpg", "jpeg", "gif", "bmp", "webp", "ico", "icns",
+  "ttf", "otf", "woff", "woff2", "eot",
+  "mp3", "wav", "ogg", "flac",
+  "mp4", "avi", "mkv", "mov",
+  "zip", "tar", "gz", "rar", "7z",
+  "pdf", "doc", "docx", "xls", "xlsx",
+  "exe", "dll", "so", "dylib",
+  "bin", "dat",
+]);
+
+function isBinaryFile(path: string): boolean {
+  const ext = path.split(".").pop()?.toLowerCase() || "";
+  return BINARY_EXTENSIONS.has(ext);
+}
+
 export async function downloadProject(projectId: string): Promise<string> {
   const home = await homeDir();
   const downloadPath = await join(home, "Documents", "RE-Frida", projectId);
@@ -206,6 +223,7 @@ export async function downloadProject(projectId: string): Promise<string> {
 
   const files = await listProjectFiles(projectId);
   for (const file of files) {
+    if (isBinaryFile(file)) continue;
     const content = await getProjectFile(projectId, file);
     const filePath = await join(downloadPath, file);
     const parent = filePath.substring(0, filePath.lastIndexOf("/"));
@@ -292,6 +310,7 @@ export async function updateProjectFromServer(
 ): Promise<void> {
   const serverFiles = await listProjectFiles(projectId);
   for (const file of serverFiles) {
+    if (isBinaryFile(file)) continue;
     const content = await getProjectFile(projectId, file);
     const filePath = await join(workspacePath, file);
     const parent = filePath.substring(0, filePath.lastIndexOf("/"));
