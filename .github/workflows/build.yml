@@ -26,16 +26,16 @@ jobs:
             artifact: re-frida-linux-amd64-debug
             profile: debug
             features: "--features debug"
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            artifact: re-frida-windows-amd64
-            profile: release
-            features: ""
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            artifact: re-frida-windows-amd64-debug
-            profile: debug
-            features: "--features debug"
+          # - os: windows-latest
+          #   target: x86_64-pc-windows-msvc
+          #   artifact: re-frida-windows-amd64
+          #   profile: release
+          #   features: ""
+          # - os: windows-latest
+          #   target: x86_64-pc-windows-msvc
+          #   artifact: re-frida-windows-amd64-debug
+          #   profile: debug
+          #   features: "--features debug"
 
     steps:
       - uses: actions/checkout@v4
@@ -93,29 +93,29 @@ jobs:
           mv frida-inject "frida-inject-${TRIPLE}"
           chmod +x "frida-inject-${TRIPLE}"
 
-      - name: Download ADB + frida (Windows)
-        if: runner.os == 'Windows' && steps.cache-tools.outputs.cache-hit != 'true'
-        shell: pwsh
-        run: |
-          $triple = "${{ matrix.target }}"
-          New-Item -ItemType Directory -Force -Path src-tauri/tools
-          cd src-tauri/tools
-          # ADB
-          Invoke-WebRequest -Uri "https://dl.google.com/android/repository/platform-tools-latest-windows.zip" -OutFile pt.zip
-          Expand-Archive -Path pt.zip -DestinationPath . -Force
-          Copy-Item platform-tools/adb.exe "adb-${triple}.exe"
-          Copy-Item platform-tools/AdbWinApi.dll ./AdbWinApi.dll -ErrorAction SilentlyContinue
-          Copy-Item platform-tools/AdbWinUsbApi.dll ./AdbWinUsbApi.dll -ErrorAction SilentlyContinue
-          Remove-Item -Recurse -Force platform-tools, pt.zip
-          # frida-inject
-          $apiResp = Invoke-RestMethod -Uri "https://api.github.com/repos/frida/frida/releases/latest"
-          $fridaTag = $apiResp.tag_name
-          $fridaVer = $fridaTag -replace '^v',''
-          Write-Host "Downloading frida-inject v${fridaVer}"
-          $baseUrl = "https://github.com/frida/frida/releases/download/${fridaTag}"
-          & curl.exe -sL -o "frida-inject.exe.xz" "${baseUrl}/frida-inject-${fridaVer}-windows-x86_64.exe.xz"
-          & xz -df "frida-inject.exe.xz"
-          Rename-Item "frida-inject.exe" "frida-inject-${triple}.exe"
+      # - name: Download ADB + frida (Windows)
+      #   if: runner.os == 'Windows' && steps.cache-tools.outputs.cache-hit != 'true'
+      #   shell: pwsh
+      #   run: |
+      #     $triple = "${{ matrix.target }}"
+      #     New-Item -ItemType Directory -Force -Path src-tauri/tools
+      #     cd src-tauri/tools
+      #     # ADB
+      #     Invoke-WebRequest -Uri "https://dl.google.com/android/repository/platform-tools-latest-windows.zip" -OutFile pt.zip
+      #     Expand-Archive -Path pt.zip -DestinationPath . -Force
+      #     Copy-Item platform-tools/adb.exe "adb-${triple}.exe"
+      #     Copy-Item platform-tools/AdbWinApi.dll ./AdbWinApi.dll -ErrorAction SilentlyContinue
+      #     Copy-Item platform-tools/AdbWinUsbApi.dll ./AdbWinUsbApi.dll -ErrorAction SilentlyContinue
+      #     Remove-Item -Recurse -Force platform-tools, pt.zip
+      #     # frida-inject
+      #     $apiResp = Invoke-RestMethod -Uri "https://api.github.com/repos/frida/frida/releases/latest"
+      #     $fridaTag = $apiResp.tag_name
+      #     $fridaVer = $fridaTag -replace '^v',''
+      #     Write-Host "Downloading frida-inject v${fridaVer}"
+      #     $baseUrl = "https://github.com/frida/frida/releases/download/${fridaTag}"
+      #     & curl.exe -sL -o "frida-inject.exe.xz" "${baseUrl}/frida-inject-${fridaVer}-windows-x86_64.exe.xz"
+      #     & xz -df "frida-inject.exe.xz"
+      #     Rename-Item "frida-inject.exe" "frida-inject-${triple}.exe"
 
       - name: Cache cargo
         uses: actions/cache@v4
