@@ -144,15 +144,8 @@ pub async fn connect_ws(state: AppState) {
                                 auth.authenticated = true;
                                 auth.username =
                                     auth_result.user.as_ref().map(|u| u.username.clone());
-                                auth.avatar_url = auth_result.user.as_ref().and_then(|u| {
-                                    u.avatar.as_ref().map(|a| {
-                                        let ext = if a.starts_with("a_") { "gif" } else { "png" };
-                                        format!(
-                                            "https://cdn.discordapp.com/avatars/{}/{}.{}",
-                                            u.id, a, ext
-                                        )
-                                    })
-                                });
+                                auth.avatar_url =
+                                    auth_result.user.as_ref().and_then(|u| u.avatar.clone());
                             }
                         }
                     }

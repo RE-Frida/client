@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   LayoutDashboard,
   Store,
@@ -8,7 +9,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { logout } from "@/hooks/tauri";
+import { logout, getAppVersion } from "@/hooks/tauri";
 import type { TabId, AuthState } from "@/types";
 
 interface SidebarProps {
@@ -32,6 +33,12 @@ export function Sidebar({
   auth,
   onLogout,
 }: SidebarProps) {
+  const [version, setVersion] = useState("");
+
+  useEffect(() => {
+    getAppVersion().then(setVersion).catch(() => setVersion("0.0.0"));
+  }, []);
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -48,7 +55,9 @@ export function Sidebar({
         <Zap className="h-5 w-5 text-primary" />
         <div>
           <h1 className="text-sm font-bold text-sidebar-foreground">RE:Frida</h1>
-          <p className="text-[10px] text-muted-foreground">v0.1.6</p>
+          {version && (
+            <p className="text-[10px] text-muted-foreground">v{version}</p>
+          )}
         </div>
       </div>
 

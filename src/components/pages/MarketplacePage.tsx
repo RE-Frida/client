@@ -1,17 +1,21 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  Search, Download, User, Plus, Trash2, FolderOpen, Package,
-  X, Tag, ChevronRight, FileCode, Loader2, CheckCircle2,
+  Search, Download, User, Plus, Trash2, Package,
+  X, Tag, FileCode, Loader2, CheckCircle2, ChevronDown, ChevronUp,
+  Image, AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { open } from "@tauri-apps/plugin-dialog";
+import { readFile } from "@tauri-apps/plugin-fs";
 import {
   listProjects, createProject, deleteProject, downloadProject,
   listProjectFiles, getProjectFile, getAuthState,
-  isProjectInstalled,
+  isProjectInstalled, getProjectDiff, updateProjectFromServer,
+  getProjectInstallPath,
 } from "@/hooks/tauri";
 import type { ProjectData, AuthState } from "@/types";
 
@@ -25,7 +29,7 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
-  const [selectedProject, setSelectedProject] = useState<ProjectData | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [projectFiles, setProjectFiles] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
@@ -33,23 +37,25 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [loadingContent, setLoadingContent] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [updating, setUpdating] = useState<string | null>(null);
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [createName, setCreateName] = useState("");
   const [createDescription, setCreateDescription] = useState("");
   const [createIcon, setCreateIcon] = useState("");
+  const [createIconPreview, setCreateIconPreview] = useState<string | null>(null);
   const [createCategory, setCreateCategory] = useState("Tools");
   const [createTags, setCreateTags] = useState("");
   const [creating, setCreating] = useState(false);
   const [installed, setInstalled] = useState<Set<string>>(new Set());
   const [showInstalled, setShowInstalled] = useState(false);
+  const [diffMap, setDiffMap] = useState<Map<string, boolean>>(new Map());
 
   const checkInstalled = useCallback(async (projects: ProjectData[]) => {
     const result = new Set<string>();
     for (const p of projects) {
       try {
-        const inst = await isProjectInstalled(p.id);
-        if (inst) result.add(p.id);
+        if (await isProjectInstalled(p.id)) result.add(p.id);
       } catch {}
     }
     setInstalled(result);
@@ -88,14 +94,33 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
     return matchesSearch && matchesCategory && matchesInstalled;
   });
 
-  const handleSelectProject = async (project: ProjectData) => {
-    setSelectedProject(project);
+  const handleToggleExpand = async (project: ProjectData) => {
+    if (expandedId === project.id) {
+      setExpandedId(null);
+      setProjectFiles([]);
+      setSelectedFile(null);
+      setFileContent(null);
+      return;
+    }
+    setExpandedId(project.id);
     setSelectedFile(null);
     setFileContent(null);
     setLoadingFiles(true);
     try {
       const files = await listProjectFiles(project.id);
       setProjectFiles(files);
+
+      // Check if installed and check diff
+      if (installed.has(project.id)) {
+        try {
+          const path = await getProjectInstallPath(project.id);
+          const d = await getProjectDiff(project.id, path);
+          const hasDiff = d.serverOnly.length > 0 || d.different.length > 0;
+          setDiffMap((prev) => new Map(prev).set(project.id, hasDiff));
+        } catch {
+          setDiffMap((prev) => new Map(prev).set(project.id, true));
+        }
+      }
     } catch (e) {
       console.error("Failed to list project files:", e);
       setProjectFiles([]);
@@ -105,12 +130,12 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
   };
 
   const handleSelectFile = async (path: string) => {
-    if (!selectedProject) return;
+    if (!expandedId) return;
     setSelectedFile(path);
     setFileContent(null);
     setLoadingContent(true);
     try {
-      const content = await getProjectFile(selectedProject.id, path);
+      const content = await getProjectFile(expandedId, path);
       setFileContent(content);
     } catch (e) {
       console.error("Failed to get file content:", e);
@@ -120,12 +145,12 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
     }
   };
 
-  const handleUseProject = async (project: ProjectData) => {
+  const handleDownload = async (project: ProjectData) => {
     setDownloading(project.id);
     try {
       await downloadProject(project.id);
       setInstalled((prev) => new Set(prev).add(project.id));
-      onUseProject(project.id);
+      setDiffMap((prev) => new Map(prev).set(project.id, false));
     } catch (e) {
       console.error("Failed to download project:", e);
     } finally {
@@ -133,11 +158,28 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
     }
   };
 
+  const handleUpdate = async (project: ProjectData) => {
+    setUpdating(project.id);
+    try {
+      const path = await getProjectInstallPath(project.id);
+      await updateProjectFromServer(project.id, path);
+      setDiffMap((prev) => new Map(prev).set(project.id, false));
+    } catch (e) {
+      console.error("Failed to update project:", e);
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const handleUse = (project: ProjectData) => {
+    onUseProject(project.id);
+  };
+
   const handleDelete = async (project: ProjectData) => {
     try {
       await deleteProject(project.id);
-      if (selectedProject?.id === project.id) {
-        setSelectedProject(null);
+      if (expandedId === project.id) {
+        setExpandedId(null);
         setProjectFiles([]);
         setSelectedFile(null);
         setFileContent(null);
@@ -150,17 +192,19 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
 
   const handleCreate = async () => {
     if (!createName.trim()) return;
+    const tags = createTags
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+    if (tags.length > 10) return;
     setCreating(true);
     try {
-      const tags = createTags
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean);
       await createProject(createName, createDescription, createIcon, createCategory, tags);
       setShowCreateDialog(false);
       setCreateName("");
       setCreateDescription("");
       setCreateIcon("");
+      setCreateIconPreview(null);
       setCreateCategory("Tools");
       setCreateTags("");
       await fetchProjects();
@@ -171,9 +215,87 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
     }
   };
 
+  const handlePickIcon = async () => {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp"] }],
+      });
+      if (selected) {
+        const bytes = await readFile(selected);
+        const binary = String.fromCharCode(...bytes);
+        const base64 = btoa(binary);
+        const ext = selected.split(".").pop()?.toLowerCase() || "png";
+        const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : ext === "gif" ? "image/gif" : ext === "webp" ? "image/webp" : "image/png";
+        const dataUrl = `data:${mime};base64,${base64}`;
+        setCreateIcon(dataUrl);
+        setCreateIconPreview(dataUrl);
+      }
+    } catch (e) {
+      console.error("Failed to pick icon:", e);
+    }
+  };
+
   const isOwner = (project: ProjectData) => {
     if (!auth?.authenticated || !auth.username) return false;
     return project.author === auth.username;
+  };
+
+  const tagsCount = createTags
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean).length;
+
+  const renderProjectActions = (project: ProjectData) => {
+    const isInstalled = installed.has(project.id);
+    const needsUpdate = diffMap.get(project.id);
+
+    if (!isInstalled) {
+      return (
+        <Button
+          size="sm"
+          onClick={() => handleDownload(project)}
+          disabled={downloading === project.id}
+        >
+          {downloading === project.id ? (
+            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+          ) : (
+            <Download className="mr-1 h-3 w-3" />
+          )}
+          Download
+        </Button>
+      );
+    }
+
+    if (needsUpdate) {
+      return (
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => handleUpdate(project)}
+            disabled={updating === project.id}
+          >
+            {updating === project.id ? (
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+            ) : (
+              <Download className="mr-1 h-3 w-3" />
+            )}
+            Update
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => handleUse(project)}>
+            Use
+          </Button>
+        </div>
+      );
+    }
+
+    return (
+      <Button size="sm" onClick={() => handleUse(project)}>
+        <CheckCircle2 className="mr-1 h-3 w-3" />
+        Use
+      </Button>
+    );
   };
 
   return (
@@ -232,233 +354,216 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
         </Card>
       )}
 
-      <div className="grid flex-1 grid-cols-3 gap-4 overflow-hidden">
-        <ScrollArea className="col-span-2">
-          <div className="space-y-3 pr-4">
-            {loading ? (
-              <div className="flex items-center justify-center py-8 text-muted-foreground">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Loading projects...
-              </div>
-            ) : filtered.length === 0 ? (
-              <div className="flex items-center justify-center py-8 text-muted-foreground">
-                <Package className="mr-2 h-4 w-4" />
-                No projects found
-              </div>
-            ) : (
-              filtered.map((project) => (
-                <Card
-                  key={project.id}
-                  className={
-                    "cursor-pointer transition-colors hover:border-primary/50 " +
-                    (selectedProject?.id === project.id ? "border-primary" : "")
-                  }
-                  onClick={() => handleSelectProject(project)}
-                >
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-lg">
-                          {project.icon || "📦"}
-                        </div>
-                        <div>
-                          <CardTitle className="text-base">{project.name}</CardTitle>
-                          <CardDescription className="mt-1 line-clamp-2">
-                            {project.description}
-                          </CardDescription>
-                        </div>
-                      </div>
-                      <Badge variant="secondary">{project.category}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          {project.author}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Download className="h-3 w-3" />
-                          {project.downloads.toLocaleString()}
-                        </span>
-                        {installed.has(project.id) && (
-                          <Badge variant="secondary" className="text-[10px] gap-1">
-                            <CheckCircle2 className="h-2.5 w-2.5" />
-                            Installed
-                          </Badge>
-                        )}
-                        <div className="flex gap-1">
-                          {project.tags.slice(0, 3).map((tag) => (
-                            <Badge key={tag} variant="outline" className="text-[10px]">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="flex gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleUseProject(project);
-                          }}
-                          disabled={downloading === project.id}
-                        >
-                          {downloading === project.id ? (
-                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                          ) : (
-                            <Download className="mr-1 h-3 w-3" />
-                          )}
-                          Use
-                        </Button>
-                        {isOwner(project) && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-destructive hover:text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(project);
-                            }}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
-        </ScrollArea>
-
-        <Card className="col-span-1 flex flex-col overflow-hidden">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">
-              {selectedProject ? selectedProject.name : "Project Files"}
-            </CardTitle>
-            <CardDescription>
-              {selectedProject ? selectedProject.description : "Select a project to view files"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-1 flex-col gap-3 overflow-hidden">
-            {selectedProject ? (
-              <>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <User className="h-3 w-3" />
-                  {selectedProject.author}
-                  <Download className="ml-2 h-3 w-3" />
-                  {selectedProject.downloads.toLocaleString()} downloads
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => handleUseProject(selectedProject)}
-                    disabled={downloading === selectedProject.id}
+      <ScrollArea className="flex-1">
+        <div className="space-y-2 pr-4">
+          {loading ? (
+            <div className="flex items-center justify-center py-8 text-muted-foreground">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Loading projects...
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex items-center justify-center py-8 text-muted-foreground">
+              <Package className="mr-2 h-4 w-4" />
+              No projects found
+            </div>
+          ) : (
+            filtered.map((project) => {
+              const isExpanded = expandedId === project.id;
+              return (
+                <div key={project.id}>
+                  <Card
+                    className={
+                      "cursor-pointer transition-colors hover:border-primary/50 " +
+                      (isExpanded ? "border-primary rounded-b-none" : "")
+                    }
+                    onClick={() => handleToggleExpand(project)}
                   >
-                    {downloading === selectedProject.id ? (
-                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                    ) : (
-                      <Download className="mr-1 h-3 w-3" />
-                    )}
-                    Use Project
-                  </Button>
-                  {isOwner(selectedProject) && (
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleDelete(selectedProject)}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted overflow-hidden">
+                            {project.icon ? (
+                              <img
+                                src={project.icon}
+                                alt={project.name}
+                                className="h-full w-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = "none";
+                                  (e.target as HTMLImageElement).nextElementSibling?.classList.remove("hidden");
+                                }}
+                              />
+                            ) : null}
+                            <span className={project.icon ? "hidden" : "text-lg"}>📦</span>
+                          </div>
+                          <div>
+                            <CardTitle className="text-base">{project.name}</CardTitle>
+                            <CardDescription className="mt-0.5 line-clamp-2">
+                              {project.description}
+                            </CardDescription>
+                          </div>
+                        </div>
+                        <Badge variant="secondary">{project.category}</Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <User className="h-3 w-3" />
+                            {project.author}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Download className="h-3 w-3" />
+                            {project.downloads.toLocaleString()}
+                          </span>
+                          {installed.has(project.id) && (
+                            <Badge variant="secondary" className="text-[10px] gap-1">
+                              <CheckCircle2 className="h-2.5 w-2.5" />
+                              Installed
+                            </Badge>
+                          )}
+                          <div className="flex gap-1">
+                            {project.tags.slice(0, 3).map((tag) => (
+                              <Badge key={tag} variant="outline" className="text-[10px]">
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isExpanded ? (
+                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Expanded detail panel */}
+                  {isExpanded && (
+                    <Card className="border-primary/50 rounded-t-none border-t-0">
+                      <CardContent className="pt-4">
+                        <div className="flex gap-6">
+                          {/* Icon */}
+                          {project.icon && (
+                            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-muted overflow-hidden">
+                              <img
+                                src={project.icon}
+                                alt={project.name}
+                                className="h-full w-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = "none";
+                                }}
+                              />
+                            </div>
+                          )}
+
+                          {/* Details */}
+                          <div className="flex flex-1 flex-col gap-3">
+                            <p className="text-sm text-muted-foreground">{project.description}</p>
+
+                            {/* Tags */}
+                            {project.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {project.tags.map((tag) => (
+                                  <Badge key={tag} variant="outline" className="text-xs">
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Action buttons */}
+                            <div className="flex items-center gap-2">
+                              {renderProjectActions(project)}
+                              {isOwner(project) && (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => handleDelete(project)}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Files section */}
+                        <div className="mt-4">
+                          <h4 className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                            <FileCode className="h-3 w-3" />
+                            Files
+                          </h4>
+                          {loadingFiles ? (
+                            <div className="flex items-center justify-center py-4 text-muted-foreground">
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            </div>
+                          ) : (
+                            <div className="flex gap-4">
+                              <div className="w-48 shrink-0 space-y-0.5">
+                                {projectFiles.map((file) => (
+                                  <button
+                                    key={file}
+                                    className={
+                                      "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-left transition-colors " +
+                                      (selectedFile === file
+                                        ? "bg-primary/10 text-primary"
+                                        : "hover:bg-muted text-muted-foreground hover:text-foreground")
+                                    }
+                                    onClick={() => handleSelectFile(file)}
+                                  >
+                                    <FileCode className="h-3 w-3 shrink-0" />
+                                    <span className="truncate">{file}</span>
+                                  </button>
+                                ))}
+                                {projectFiles.length === 0 && (
+                                  <p className="py-2 text-center text-xs text-muted-foreground">
+                                    No files
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* File preview */}
+                              {selectedFile && (
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-xs font-medium text-muted-foreground mb-1">
+                                    {selectedFile}
+                                  </div>
+                                  {loadingContent ? (
+                                    <div className="flex items-center justify-center py-4 text-muted-foreground">
+                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    </div>
+                                  ) : (
+                                    <pre className="max-h-60 overflow-auto rounded bg-muted p-3 text-xs font-mono whitespace-pre-wrap">
+                                      {fileContent}
+                                    </pre>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
                   )}
                 </div>
-                <div className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                  <FolderOpen className="h-3 w-3" />
-                  Files
-                  <ChevronRight className="h-3 w-3" />
-                  {selectedFile && <span className="text-foreground">{selectedFile}</span>}
-                </div>
-                {loadingFiles ? (
-                  <div className="flex items-center justify-center py-4 text-muted-foreground">
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  </div>
-                ) : (
-                  <ScrollArea className="flex-1">
-                    <div className="space-y-1 pr-2">
-                      {projectFiles.map((file) => (
-                        <button
-                          key={file}
-                          className={
-                            "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-left transition-colors " +
-                            (selectedFile === file
-                              ? "bg-primary/10 text-primary"
-                              : "hover:bg-muted text-muted-foreground hover:text-foreground")
-                          }
-                          onClick={() => handleSelectFile(file)}
-                        >
-                          <FileCode className="h-3 w-3 shrink-0" />
-                          <span className="truncate">{file}</span>
-                        </button>
-                      ))}
-                      {projectFiles.length === 0 && (
-                        <p className="py-2 text-center text-xs text-muted-foreground">
-                          No files in this project
-                        </p>
-                      )}
-                    </div>
-                  </ScrollArea>
-                )}
-                {selectedFile && (
-                  <div className="mt-1">
-                    <div className="text-xs font-medium text-muted-foreground mb-1">
-                      Preview: {selectedFile}
-                    </div>
-                    {loadingContent ? (
-                      <div className="flex items-center justify-center py-4 text-muted-foreground">
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      </div>
-                    ) : (
-                      <pre className="max-h-40 overflow-auto rounded bg-muted p-3 text-xs font-mono">
-                        {fileContent}
-                      </pre>
-                    )}
-                    <Button
-                      size="sm"
-                      className="mt-2 w-full"
-                      onClick={() => {
-                        if (selectedProject) onUseProject(selectedProject.id);
-                      }}
-                    >
-                      Use This File
-                    </Button>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="flex flex-1 items-center justify-center text-muted-foreground">
-                <p className="text-sm">Select a project to view files</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              );
+            })
+          )}
+        </div>
+      </ScrollArea>
 
+      {/* Create Dialog */}
       {showCreateDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <Card className="w-full max-w-md">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Create Project</CardTitle>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowCreateDialog(false)}
-                >
+                <Button variant="ghost" size="icon" onClick={() => setShowCreateDialog(false)}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
@@ -482,13 +587,18 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Icon (emoji)</label>
-                <Input
-                  placeholder="📦"
-                  value={createIcon}
-                  onChange={(e) => setCreateIcon(e.target.value)}
-                  className="w-20"
-                />
+                <label className="text-sm font-medium">Icon</label>
+                <div className="flex items-center gap-3">
+                  <Button variant="outline" size="sm" onClick={handlePickIcon}>
+                    <Image className="mr-1.5 h-4 w-4" />
+                    Choose Image
+                  </Button>
+                  {createIconPreview && (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted overflow-hidden">
+                      <img src={createIconPreview} alt="icon" className="h-full w-full object-cover" />
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Category</label>
@@ -507,22 +617,42 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Tags (comma-separated)</label>
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <span>Tags (comma-separated)</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {tagsCount}/10
+                  </span>
+                </label>
                 <div className="relative">
                   <Tag className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     placeholder="frida, hooking, android"
                     value={createTags}
-                    onChange={(e) => setCreateTags(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const currentTags = val.split(",").map((t) => t.trim()).filter(Boolean);
+                      if (currentTags.length <= 10) {
+                        setCreateTags(val);
+                      }
+                    }}
                     className="pl-9"
                   />
                 </div>
+                {tagsCount >= 10 && (
+                  <p className="text-[10px] text-destructive flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    Maximum 10 tags
+                  </p>
+                )}
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleCreate} disabled={!createName.trim() || creating}>
+                <Button
+                  onClick={handleCreate}
+                  disabled={!createName.trim() || creating || tagsCount > 10}
+                >
                   {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Create
                 </Button>

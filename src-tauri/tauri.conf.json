@@ -26,6 +26,16 @@
       "csp": null
     }
   },
+  "plugins": {
+    "fs": {
+      "scope": {
+        "allow": [
+          "$HOME/Documents/**",
+          "$HOME/.config/re-frida/**"
+        ]
+      }
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
