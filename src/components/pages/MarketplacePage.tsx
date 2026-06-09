@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Search, Download, User, Plus, Trash2, Package,
   X, Tag, FileCode, Loader2, CheckCircle2, ChevronDown,
-  Image, AlertCircle, ArrowLeft,
+  Image, AlertCircle, ArrowLeft, FolderOpen, Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,11 +11,12 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
+import { open as openShell } from "@tauri-apps/plugin-shell";
 import {
   listProjects, createProject, deleteProject, downloadProject,
   listProjectFiles, getProjectFile, getAuthState,
   isProjectInstalled, getProjectDiff, updateProjectFromServer,
-  getProjectInstallPath,
+  getProjectInstallPath, publishProject,
 } from "@/hooks/tauri";
 import type { ProjectData, AuthState } from "@/types";
 
@@ -52,6 +53,7 @@ export function Marketplace() {
   const [loadingContent, setLoadingContent] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [publishing, setPublishing] = useState<string | null>(null);
 
   // Delete confirmation
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -176,6 +178,28 @@ export function Marketplace() {
     }
   };
 
+  const handleOpenFolder = async (project: ProjectData) => {
+    try {
+      const path = await getProjectInstallPath(project.id);
+      await openShell(path);
+    } catch (e) {
+      console.error("Failed to open folder:", e);
+    }
+  };
+
+  const handlePublish = async (project: ProjectData) => {
+    setPublishing(project.id);
+    try {
+      const path = await getProjectInstallPath(project.id);
+      await publishProject(project.id, path);
+      setDiffMap((prev) => new Map(prev).set(project.id, false));
+    } catch (e) {
+      console.error("Failed to publish:", e);
+    } finally {
+      setPublishing(null);
+    }
+  };
+
   const handleDeleteClick = (project: ProjectData) => {
     setDeleteTarget(project);
     setShowDeleteConfirm(true);
@@ -258,6 +282,7 @@ export function Marketplace() {
   const renderProjectActions = (project: ProjectData, inCard: boolean = false) => {
     const isInstalled = installed.has(project.id);
     const needsUpdate = diffMap.get(project.id);
+    const isOwn = isOwner(project);
     const click = (fn: (...args: any[]) => void) => (e: React.MouseEvent) => {
       if (inCard) e.stopPropagation();
       fn(project);
@@ -280,9 +305,27 @@ export function Marketplace() {
       );
     }
 
-    if (needsUpdate) {
-      return (
-        <div className="flex gap-2">
+    return (
+      <div className="flex gap-2">
+        <Button size="sm" variant="outline" onClick={click(handleOpenFolder)}>
+          <FolderOpen className="mr-1 h-3 w-3" />
+          Open Folder
+        </Button>
+        {isOwn && needsUpdate ? (
+          <Button
+            size="sm"
+            variant="default"
+            onClick={click(handlePublish)}
+            disabled={publishing === project.id}
+          >
+            {publishing === project.id ? (
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+            ) : (
+              <Upload className="mr-1 h-3 w-3" />
+            )}
+            Publish
+          </Button>
+        ) : needsUpdate ? (
           <Button
             size="sm"
             variant="secondary"
@@ -296,15 +339,13 @@ export function Marketplace() {
             )}
             Update
           </Button>
-        </div>
-      );
-    }
-
-    return (
-      <Button size="sm" variant="outline" onClick={click(handleDownload)}>
-        <Download className="mr-1 h-3 w-3" />
-        Redownload
-      </Button>
+        ) : (
+          <Button size="sm" variant="outline" onClick={click(handleDownload)}>
+            <Download className="mr-1 h-3 w-3" />
+            Redownload
+          </Button>
+        )}
+      </div>
     );
   };
 

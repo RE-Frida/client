@@ -52,7 +52,7 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
     }
   };
 
-  const pkg = config?.settings.custom_package || "com.target.app";
+  const pkg = config?.settings.custom_package || "org.refrida.apk";
 
   const handleSelectScript = async () => {
     const selected = await open({

@@ -21,7 +21,7 @@ function applyTheme(theme: string) {
 
 export function SettingsPage() {
   const [config, setConfig] = useState<AppConfig>({
-    settings: { theme: "dark", frida_port: 27042, custom_package: "", advanced_mode: false },
+    settings: { theme: "dark", frida_port: 27042, custom_package: "org.refrida.apk", advanced_mode: false },
     auth: {},
   });
   const [saving, setSaving] = useState(false);
@@ -173,7 +173,7 @@ export function SettingsPage() {
                         settings: { ...config.settings, custom_package: e.target.value },
                       })
                     }
-                    placeholder="com.target.app"
+                    placeholder="org.refrida.apk"
                   />
                 </div>
               </CardContent>

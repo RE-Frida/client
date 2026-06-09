@@ -43,7 +43,7 @@ impl Default for AppSettings {
         Self {
             theme: "dark".to_string(),
             frida_port: 27042,
-            custom_package: "com.target.app".to_string(),
+            custom_package: "org.refrida.apk".to_string(),
             advanced_mode: false,
         }
     }

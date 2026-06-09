@@ -158,7 +158,7 @@ export function Dashboard({ selectedDevice, onDeviceChange }: DashboardProps) {
               <span className="text-sm">{connected ? "Connected to server" : "Disconnected"}</span>
             </div>
             <div className="text-xs text-muted-foreground">
-              Package: {config?.custom_package || "com.target.app"}
+              Package: {config?.settings.custom_package || "org.refrida.apk"}
             </div>
           </CardContent>
         </Card>
