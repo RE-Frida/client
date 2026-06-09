@@ -103,7 +103,6 @@ pub async fn execute_script(
         .arg("Gadget")
         .arg("-l")
         .arg(script_path.to_str().unwrap_or(""))
-        .arg("--no-pause")
         .output();
 
     let _ = std::fs::remove_file(&script_path);
