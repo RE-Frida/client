@@ -77,7 +77,7 @@ export function LogsPage() {
 
       <div
         ref={scrollRef}
-        className="flex-1 overflow-auto rounded-lg border bg-card p-4 font-mono text-xs"
+        className="selectable flex-1 overflow-auto rounded-lg border bg-card p-4 font-mono text-xs"
       >
         {filteredLines.length === 0 || (filteredLines.length === 1 && !filteredLines[0]) ? (
           <p className="text-muted-foreground">No logs yet. Start a session to see output.</p>
