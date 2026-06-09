@@ -14,6 +14,7 @@ export interface AppSettings {
   frida_port: number;
   custom_package: string;
   advanced_mode: boolean;
+  accent_color?: string;
 }
 
 export interface ConfigAuth {

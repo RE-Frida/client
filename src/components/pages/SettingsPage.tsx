@@ -6,16 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getConfig, saveConfig } from "@/hooks/tauri";
+import { applyTheme, ACCENT_PRESETS } from "@/lib/theme";
 import type { AppConfig } from "@/types";
-
-function applyTheme(theme: string) {
-  if (theme === "system") {
-    const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
-  } else {
-    document.documentElement.setAttribute("data-theme", theme);
-  }
-}
 
 export function SettingsPage() {
   const [config, setConfig] = useState<AppConfig>({
@@ -38,6 +30,8 @@ export function SettingsPage() {
       setSaving(false);
     }
   };
+
+  const isStandardTheme = ["dark", "light", "system"].includes(config.settings.theme);
 
   const themeGroups = [
     {
@@ -120,8 +114,9 @@ export function SettingsPage() {
                       <button
                         key={theme.id}
                         onClick={() => {
-                          setConfig({ ...config, settings: { ...config.settings, theme: theme.id } });
-                          applyTheme(theme.id);
+                          const newSettings = { ...config.settings, theme: theme.id };
+                          setConfig({ ...config, settings: newSettings });
+                          applyTheme(theme.id, newSettings.accent_color);
                         }}
                         className={
                           "flex flex-col items-center gap-2 rounded-lg border p-3 text-sm transition-colors min-w-[90px] " +
@@ -138,6 +133,56 @@ export function SettingsPage() {
                 </div>
               </div>
             ))}
+
+            {isStandardTheme && (
+              <div>
+                <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Accent Color
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {ACCENT_PRESETS.map((preset) => (
+                    <button
+                      key={preset.value}
+                      onClick={() => {
+                        const newSettings = { ...config.settings, accent_color: preset.value };
+                        setConfig({ ...config, settings: newSettings });
+                        applyTheme(config.settings.theme, preset.value);
+                      }}
+                      className={
+                        "h-7 w-7 rounded-full border-2 transition-transform hover:scale-110 " +
+                        (config.settings.accent_color === preset.value
+                          ? "border-foreground scale-110"
+                          : "border-transparent")
+                      }
+                      style={{ backgroundColor: preset.value }}
+                      title={preset.name}
+                    />
+                  ))}
+                  <input
+                    type="color"
+                    value={config.settings.accent_color || "#6366f1"}
+                    onChange={(e) => {
+                      const newSettings = { ...config.settings, accent_color: e.target.value };
+                      setConfig({ ...config, settings: newSettings });
+                      applyTheme(config.settings.theme, e.target.value);
+                    }}
+                    className="h-7 w-7 cursor-pointer rounded-full border-0 p-0"
+                  />
+                  {config.settings.accent_color && (
+                    <button
+                      onClick={() => {
+                        const newSettings = { ...config.settings, accent_color: undefined };
+                        setConfig({ ...config, settings: newSettings });
+                        applyTheme(config.settings.theme);
+                      }}
+                      className="text-xs text-muted-foreground hover:text-foreground ml-1"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

@@ -23,6 +23,8 @@ pub struct AppSettings {
     pub frida_port: u16,
     pub custom_package: String,
     pub advanced_mode: bool,
+    #[serde(default)]
+    pub accent_color: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,6 +49,7 @@ impl Default for AppSettings {
             frida_port: 27042,
             custom_package: DEFAULT_PACKAGE.to_string(),
             advanced_mode: false,
+            accent_color: None,
         }
     }
 }

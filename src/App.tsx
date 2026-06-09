@@ -8,16 +8,8 @@ import { Marketplace } from "@/components/pages/MarketplacePage";
 import { SettingsPage } from "@/components/pages/SettingsPage";
 import { LoginPage } from "@/components/pages/LoginPage";
 import { getAuthState, isConnected, getConfig, reconnect } from "@/hooks/tauri";
+import { applyTheme } from "@/lib/theme";
 import type { TabId, AuthState } from "@/types";
-
-function applyTheme(theme: string) {
-  if (theme === "system") {
-    const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
-  } else {
-    document.documentElement.setAttribute("data-theme", theme);
-  }
-}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>("dashboard");
@@ -34,7 +26,7 @@ export default function App() {
 
   useEffect(() => {
     pollAuth();
-    getConfig().then((config) => applyTheme(config.settings.theme)).catch(() => {});
+    getConfig().then((config) => applyTheme(config.settings.theme, config.settings.accent_color)).catch(() => {});
     const authPoll = setInterval(pollAuth, 2000);
     // After 10 seconds of no connection, show failed screen
     const failTimer = setTimeout(() => {
