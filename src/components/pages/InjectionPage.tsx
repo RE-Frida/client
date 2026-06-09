@@ -33,7 +33,7 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
   const outputRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    getConfig().then((c) => { setConfig(c); setCurrentTheme(c.theme); }).catch(() => {});
+    getConfig().then((c) => { setConfig(c); setCurrentTheme(c.settings.theme); }).catch(() => {});
     refreshDevices();
   }, []);
 
