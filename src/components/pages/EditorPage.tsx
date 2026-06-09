@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   Play, Square, Send, Smartphone, Package, RefreshCw, ChevronDown,
-  FileCode2, FolderOpen, FolderTree, Save, Plus,
+  FileCode2, FolderOpen, FolderTree, Save, Plus, FolderInput, Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,28 +9,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ScriptEditor } from "@/components/ui/script-editor";
 import {
   getConfig, discoverDevices, startSession, executeScript, launchApp, killApp,
+  selectFolder, readWorkspaceFiles, readFileContent, writeFileContent,
+  loadWorkspaceConfig, saveWorkspaceConfig,
+  type WorkspaceFile, type WorkspaceConfig,
 } from "@/hooks/tauri";
 import type { AppConfig, DeviceInfo } from "@/types";
-
-interface FileNode {
-  name: string;
-  type: "file" | "folder";
-  children?: FileNode[];
-  content?: string;
-}
-
-const INITIAL_TREE: FileNode[] = [
-  {
-    name: "scripts",
-    type: "folder",
-    children: [
-      { name: "main.js", type: "file", content: "// Frida script\nJava.perform(function() {\n  var MainActivity = Java.use(\"com.target.app.MainActivity\");\n  MainActivity.onCreate.implementation = function(savedInstanceState) {\n    console.log(\"[*] onCreate called\");\n    this.onCreate(savedInstanceState);\n  };\n});" },
-      { name: "hooks", type: "folder", children: [
-        { name: "crypto.js", type: "file", content: "// Crypto hooks\nJava.perform(function() {\n  var Cipher = Java.use('javax.crypto.Cipher');\n  Cipher.doFinal.overload('[B').implementation = function(input) {\n    console.log('[*] Cipher.doFinal called');\n    return this.doFinal(input);\n  };\n});" },
-      ]},
-    ],
-  },
-];
 
 interface EditorPageProps {
   selectedDevice: string | null;
@@ -40,13 +23,16 @@ interface EditorPageProps {
 export function EditorPage({ selectedDevice, onDeviceChange }: EditorPageProps) {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
-  const [tree, setTree] = useState<FileNode[]>(INITIAL_TREE);
-  const [selectedFile, setSelectedFile] = useState<FileNode | null>(null);
+  const [workspacePath, setWorkspacePath] = useState<string | null>(null);
+  const [workspaceConfig, setWorkspaceConfig] = useState<WorkspaceConfig>({ default_file: "main.js" });
+  const [files, setFiles] = useState<WorkspaceFile[]>([]);
+  const [selectedFile, setSelectedFile] = useState<WorkspaceFile | null>(null);
   const [code, setCode] = useState("");
   const [output, setOutput] = useState("");
   const [running, setRunning] = useState(false);
   const [newFileName, setNewFileName] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     getConfig().then(setConfig).catch(() => {});
@@ -70,25 +56,63 @@ export function EditorPage({ selectedDevice, onDeviceChange }: EditorPageProps) 
 
   const pkg = config?.custom_package || "com.target.app";
 
-  const selectFile = (node: FileNode) => {
-    if (node.type === "file") {
-      setSelectedFile(node);
-      setCode(node.content || "");
+  const openWorkspace = async () => {
+    const folder = await selectFolder();
+    if (folder) {
+      setWorkspacePath(folder);
+      await loadFiles(folder);
+      const wsConfig = await loadWorkspaceConfig(folder);
+      setWorkspaceConfig(wsConfig);
     }
   };
 
-  const saveFile = () => {
-    if (!selectedFile) return;
-    selectedFile.content = code;
-    setOutput("Saved " + selectedFile.name);
+  const loadFiles = async (path: string) => {
+    try {
+      const fileList = await readWorkspaceFiles(path);
+      setFiles(fileList);
+    } catch (e) {
+      console.error("Failed to load files:", e);
+    }
   };
 
-  const addFile = () => {
-    if (!newFileName) return;
+  const refreshFiles = async () => {
+    if (workspacePath) {
+      await loadFiles(workspacePath);
+    }
+  };
+
+  const selectFile = async (file: WorkspaceFile) => {
+    if (file.isDir || !workspacePath) return;
+    setSelectedFile(file);
+    try {
+      const content = await readFileContent(workspacePath, file.path);
+      setCode(content);
+    } catch (e) {
+      console.error("Failed to read file:", e);
+      setCode("");
+    }
+  };
+
+  const saveFile = async () => {
+    if (!selectedFile || !workspacePath) return;
+    try {
+      await writeFileContent(workspacePath, selectedFile.path, code);
+      setOutput("Saved " + selectedFile.name);
+    } catch (e) {
+      setOutput("Error saving: " + e);
+    }
+  };
+
+  const addFile = async () => {
+    if (!newFileName || !workspacePath) return;
     const name = newFileName.endsWith(".js") ? newFileName : newFileName + ".js";
-    const newFile: FileNode = { name, type: "file", content: "// New script\n" };
-    setTree((prev) => [...prev, newFile]);
-    setNewFileName("");
+    try {
+      await writeFileContent(workspacePath, name, "// New script\n");
+      setNewFileName("");
+      await refreshFiles();
+    } catch (e) {
+      console.error("Failed to create file:", e);
+    }
   };
 
   const handleStart = async () => {
@@ -113,10 +137,15 @@ export function EditorPage({ selectedDevice, onDeviceChange }: EditorPageProps) 
   };
 
   const handleExecute = async () => {
-    if (!selectedDevice || !selectedFile) return;
+    if (!selectedDevice) return;
     setRunning(true);
     try {
-      const result = await executeScript(selectedDevice, code);
+      let codeToRun = code;
+      if (!selectedFile && workspacePath) {
+        const defaultPath = workspaceConfig.default_file || "main.js";
+        codeToRun = await readFileContent(workspacePath, defaultPath);
+      }
+      const result = await executeScript(selectedDevice, codeToRun);
       setOutput(result);
     } catch (e) {
       setOutput("Error: " + e);
@@ -125,26 +154,36 @@ export function EditorPage({ selectedDevice, onDeviceChange }: EditorPageProps) 
     }
   };
 
-  const renderTree = (nodes: FileNode[], depth = 0) => {
-    return nodes.map((node) => (
-      <div key={node.name + depth} style={{ paddingLeft: depth * 16 }}>
+  const saveWorkspaceSettings = async () => {
+    if (!workspacePath) return;
+    try {
+      await saveWorkspaceConfig(workspacePath, workspaceConfig);
+      setOutput("Workspace settings saved");
+      setShowSettings(false);
+    } catch (e) {
+      setOutput("Error saving settings: " + e);
+    }
+  };
+
+  const renderTree = (items: WorkspaceFile[], depth = 0) => {
+    return items.map((item) => (
+      <div key={item.path} style={{ paddingLeft: depth * 16 }}>
         <button
-          onClick={() => selectFile(node)}
+          onClick={() => selectFile(item)}
           className={
             "flex w-full items-center gap-2 rounded px-2 py-1 text-xs transition-colors " +
-            (selectedFile?.name === node.name
+            (selectedFile?.path === item.path
               ? "bg-accent text-accent-foreground"
               : "hover:bg-accent/50")
           }
         >
-          {node.type === "folder" ? (
+          {item.isDir ? (
             <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
           ) : (
             <FileCode2 className="h-3.5 w-3.5 text-primary" />
           )}
-          <span className="truncate">{node.name}</span>
+          <span className="truncate">{item.name}</span>
         </button>
-        {node.children && renderTree(node.children, depth + 1)}
       </div>
     ));
   };
@@ -154,7 +193,6 @@ export function EditorPage({ selectedDevice, onDeviceChange }: EditorPageProps) 
       {/* Top Toolbar */}
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <div className="flex items-center gap-3">
-          {/* Device Picker */}
           <div className="relative">
             <select
               value={selectedDevice || ""}
@@ -191,7 +229,7 @@ export function EditorPage({ selectedDevice, onDeviceChange }: EditorPageProps) 
             <Square className="mr-1 h-3 w-3" />
             Stop
           </Button>
-          <Button variant="secondary" size="sm" onClick={handleExecute} disabled={!selectedDevice || !selectedFile || running}>
+          <Button variant="secondary" size="sm" onClick={handleExecute} disabled={!selectedDevice || running}>
             <Send className="mr-1 h-3 w-3" />
             Execute
           </Button>
@@ -205,35 +243,79 @@ export function EditorPage({ selectedDevice, onDeviceChange }: EditorPageProps) 
           <div className="flex items-center justify-between border-b border-border px-3 py-1.5">
             <span className="text-xs font-medium flex items-center gap-1.5">
               <FolderTree className="h-3.5 w-3.5" />
-              Files
+              {workspacePath ? "Workspace" : "Files"}
             </span>
-          </div>
-          <ScrollArea className="flex-1 p-1.5">
-            {renderTree(tree)}
-          </ScrollArea>
-          <div className="border-t border-border p-1.5">
             <div className="flex gap-1">
-              <Input
-                placeholder="new file.js"
-                value={newFileName}
-                onChange={(e) => setNewFileName(e.target.value)}
-                className="h-6 text-xs"
-                onKeyDown={(e) => e.key === "Enter" && addFile()}
-              />
-              <Button size="sm" className="h-6 px-1.5" onClick={addFile}>
-                <Plus className="h-3 w-3" />
+              {workspacePath && (
+                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={refreshFiles}>
+                  <RefreshCw className="h-3 w-3" />
+                </Button>
+              )}
+              <Button variant="ghost" size="icon" className="h-5 w-5" onClick={openWorkspace}>
+                <FolderInput className="h-3 w-3" />
               </Button>
+              {workspacePath && (
+                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setShowSettings(!showSettings)}>
+                  <Settings className="h-3 w-3" />
+                </Button>
+              )}
             </div>
           </div>
+
+          {/* Workspace Settings */}
+          {showSettings && workspacePath && (
+            <div className="border-b border-border p-2 space-y-2">
+              <div className="text-xs font-medium">Workspace Settings</div>
+              <div>
+                <label className="text-[10px] text-muted-foreground">Default File</label>
+                <Input
+                  value={workspaceConfig.default_file}
+                  onChange={(e) => setWorkspaceConfig({ ...workspaceConfig, default_file: e.target.value })}
+                  className="h-6 text-xs"
+                />
+              </div>
+              <Button size="sm" className="h-6 text-xs w-full" onClick={saveWorkspaceSettings}>
+                Save
+              </Button>
+            </div>
+          )}
+
+          <ScrollArea className="flex-1 p-1.5">
+            {workspacePath ? (
+              renderTree(files)
+            ) : (
+              <div className="flex h-full items-center justify-center p-4 text-center text-muted-foreground">
+                <div>
+                  <FolderInput className="mx-auto h-8 w-8 mb-2 opacity-20" />
+                  <p className="text-xs">Open a folder to start</p>
+                </div>
+              </div>
+            )}
+          </ScrollArea>
+          {workspacePath && (
+            <div className="border-t border-border p-1.5">
+              <div className="flex gap-1">
+                <Input
+                  placeholder="new file.js"
+                  value={newFileName}
+                  onChange={(e) => setNewFileName(e.target.value)}
+                  className="h-6 text-xs"
+                  onKeyDown={(e) => e.key === "Enter" && addFile()}
+                />
+                <Button size="sm" className="h-6 px-1.5" onClick={addFile}>
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Editor + Output */}
         <div className="flex flex-1 flex-col overflow-hidden">
-          {/* File Header */}
           <div className="flex items-center justify-between border-b border-border px-3 py-1.5">
             <div className="flex items-center gap-2 text-xs">
               <FileCode2 className="h-3.5 w-3.5 text-primary" />
-              {selectedFile ? selectedFile.name : "No file open"}
+              {selectedFile ? selectedFile.name : workspacePath ? workspaceConfig.default_file || "main.js" : "No file open"}
             </div>
             <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={saveFile} disabled={!selectedFile}>
               <Save className="mr-1 h-3 w-3" />
@@ -241,21 +323,19 @@ export function EditorPage({ selectedDevice, onDeviceChange }: EditorPageProps) 
             </Button>
           </div>
 
-          {/* Code Editor */}
           <div className="flex-1 overflow-hidden">
-            {selectedFile ? (
+            {selectedFile || workspacePath ? (
               <ScriptEditor value={code} onChange={setCode} />
             ) : (
               <div className="flex h-full items-center justify-center text-muted-foreground">
                 <div className="text-center">
                   <FileCode2 className="mx-auto h-10 w-10 mb-2 opacity-20" />
-                  <p className="text-sm">Select a file to edit</p>
+                  <p className="text-sm">Open a folder or select a file</p>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Output */}
           {output && (
             <div className="border-t border-border max-h-[120px] overflow-auto">
               <pre className="bg-muted p-2 text-xs font-mono whitespace-pre-wrap">{output}</pre>

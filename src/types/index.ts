@@ -31,6 +31,20 @@ export interface ScriptData {
   created_at: string;
 }
 
+export interface ProjectData {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  author: string;
+  author_discord_id: string;
+  category: string;
+  tags: string[];
+  downloads: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AuthState {
   authenticated: boolean;
   username: string | null;

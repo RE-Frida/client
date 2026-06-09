@@ -53,13 +53,23 @@ pub enum Action {
     GetConfig,
     GetGuidelines,
 
-    // ── Scripts ──
+    // ── Scripts (legacy) ──
     ListScripts,
     GetScript,
     SubmitScript,
     DownloadScript,
     GetTags,
     VoteScript,
+
+    // ── Projects ──
+    ListProjects,
+    GetProject,
+    CreateProject,
+    UpdateProject,
+    DeleteProject,
+    GetProjectFile,
+    UpdateProjectFile,
+    ListProjectFiles,
 
     // ── Internal ──
     ServerShutdown,
@@ -237,4 +247,69 @@ pub struct TagsData {
     pub categories: Vec<TagCategory>,
     pub games: Vec<TagGame>,
     pub game_versions: Vec<TagVersion>,
+}
+
+// ─── Projects ────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectData {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub icon: String,
+    pub author: String,
+    pub author_discord_id: String,
+    pub category: String,
+    pub tags: Vec<String>,
+    pub downloads: u64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectFile {
+    pub path: String,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateProjectPayload {
+    pub name: String,
+    pub description: String,
+    pub icon: String,
+    pub category: String,
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateProjectPayload {
+    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateFilePayload {
+    pub project_id: String,
+    pub path: String,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListFilesPayload {
+    pub project_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetFilePayload {
+    pub project_id: String,
+    pub path: String,
 }

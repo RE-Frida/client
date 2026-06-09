@@ -1,5 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { DeviceInfo, AppConfig, AuthState, ScriptData } from "@/types";
+import { open } from "@tauri-apps/plugin-dialog";
+import { readDir, readTextFile, writeTextFile, exists, mkdir } from "@tauri-apps/plugin-fs";
+import { join, homeDir } from "@tauri-apps/api/path";
+import type { DeviceInfo, AppConfig, AuthState, ScriptData, ProjectData } from "@/types";
 
 // ─── ADB ────────────────────────────────────────────────────────
 
@@ -117,4 +120,94 @@ export async function getAppVersion(): Promise<string> {
 
 export async function isDebugBuild(): Promise<boolean> {
   return invoke("is_debug_build");
+}
+
+// ─── Workspace ───────────────────────────────────────────────────
+
+export interface WorkspaceFile {
+  name: string;
+  path: string;
+  isDir: boolean;
+  content?: string;
+}
+
+export interface WorkspaceConfig {
+  default_file: string;
+  name?: string;
+}
+
+export async function selectFolder(): Promise<string | null> {
+  return await open({ directory: true });
+}
+
+export async function readWorkspaceFiles(dirPath: string): Promise<WorkspaceFile[]> {
+  const files: WorkspaceFile[] = [];
+  
+  async function scan(currentPath: string, relativePath: string) {
+    const entries = await readDir(currentPath);
+    for (const entry of entries) {
+      const fullPath = await join(currentPath, entry.name);
+      const relPath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
+      
+      // Skip .re-frida directory
+      if (entry.name === ".re-frida") continue;
+      
+      if (entry.isDirectory) {
+        files.push({ name: entry.name, path: relPath, isDir: true });
+        await scan(fullPath, relPath);
+      } else {
+        files.push({ name: entry.name, path: relPath, isDir: false });
+      }
+    }
+  }
+  
+  await scan(dirPath, "");
+  return files;
+}
+
+export async function readFileContent(dirPath: string, filePath: string): Promise<string> {
+  const fullPath = await join(dirPath, filePath);
+  return await readTextFile(fullPath);
+}
+
+export async function writeFileContent(dirPath: string, filePath: string, content: string): Promise<void> {
+  const fullPath = await join(dirPath, filePath);
+  await writeTextFile(fullPath, content);
+}
+
+export async function loadWorkspaceConfig(dirPath: string): Promise<WorkspaceConfig> {
+  const configPath = await join(dirPath, ".re-frida", "config.json");
+  const configExists = await exists(configPath);
+  
+  if (!configExists) {
+    return { default_file: "main.js" };
+  }
+  
+  const content = await readTextFile(configPath);
+  return JSON.parse(content);
+}
+
+export async function saveWorkspaceConfig(dirPath: string, config: WorkspaceConfig): Promise<void> {
+  const configDir = await join(dirPath, ".re-frida");
+  const dirExists = await exists(configDir);
+  if (!dirExists) {
+    await mkdir(configDir, { recursive: true });
+  }
+  
+  const configPath = await join(configDir, "config.json");
+  await writeTextFile(configPath, JSON.stringify(config, null, 2));
+}
+
+export async function downloadProject(projectId: string): Promise<string> {
+  const home = await homeDir();
+  const downloadPath = await join(home, "Documents", "RE-Frida", projectId);
+  
+  // Create directory
+  const dirExists = await exists(downloadPath);
+  if (!dirExists) {
+    await mkdir(downloadPath, { recursive: true });
+  }
+  
+  // TODO: Download files from server
+  return downloadPath;
 }
