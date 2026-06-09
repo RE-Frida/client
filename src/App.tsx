@@ -7,8 +7,8 @@ import { LogsPage } from "@/components/pages/LogsPage";
 import { Marketplace } from "@/components/pages/MarketplacePage";
 import { SettingsPage } from "@/components/pages/SettingsPage";
 import { LoginPage } from "@/components/pages/LoginPage";
-import { getAuthState, isConnected, getConfig, discoverDevices } from "@/hooks/tauri";
-import type { TabId, AuthState, DeviceInfo } from "@/types";
+import { getAuthState, isConnected, getConfig } from "@/hooks/tauri";
+import type { TabId, AuthState } from "@/types";
 
 function applyTheme(theme: string) {
   if (theme === "light") {
