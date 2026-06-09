@@ -11,6 +11,7 @@ import {
 } from "@/hooks/tauri";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readTextFile } from "@tauri-apps/plugin-fs";
+import { listen } from "@tauri-apps/api/event";
 import CodeMirror from "@uiw/react-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
 import { oneDark } from "@codemirror/theme-one-dark";
@@ -94,12 +95,21 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
   const handleExecute = async () => {
     if (!selectedDevice || !scriptCode.trim()) return;
     setRunning(true);
+    setOutput("");
+
+    const unlisten = await listen<{ line: string; source: string }>("frida-line", (event) => {
+      setOutput((prev) => prev + event.payload.line + "\n");
+    });
+
     try {
       const result = await executeScript(selectedDevice, scriptCode);
-      setOutput(result);
+      if (result) {
+        setOutput((prev) => prev + result);
+      }
     } catch (e) {
-      setOutput("Error: " + e);
+      setOutput((prev) => prev + "Error: " + e);
     } finally {
+      unlisten();
       setRunning(false);
     }
   };

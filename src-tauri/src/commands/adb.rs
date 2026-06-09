@@ -1,5 +1,6 @@
-use std::process::Command;
-use tauri::State;
+use std::process::{Command as StdCommand, Stdio};
+use tauri::{Emitter, State};
+use tokio::io::{AsyncBufReadExt, BufReader};
 
 use crate::state::{AppState, dbg_log};
 use crate::types::DeviceInfo;
@@ -8,7 +9,7 @@ use crate::config::DEFAULT_FRIDA_INSTALL;
 #[tauri::command]
 pub async fn discover_devices(state: State<'_, AppState>) -> Result<Vec<DeviceInfo>, String> {
     dbg_log!("discover_devices called");
-    let output = Command::new(&state.adb_path)
+    let output = StdCommand::new(&state.adb_path)
         .arg("devices")
         .arg("-l")
         .output()
@@ -55,7 +56,7 @@ pub async fn start_session(state: State<'_, AppState>, device_id: String) -> Res
     let port = state.config.lock().unwrap().settings.frida_port;
     dbg_log!("start_session on device {} port {}", device_id, port);
 
-    let output = Command::new(&state.adb_path)
+    let output = StdCommand::new(&state.adb_path)
         .arg("-s")
         .arg(&device_id)
         .arg("forward")
@@ -82,60 +83,129 @@ pub async fn stop_session(state: State<'_, AppState>) -> Result<String, String> 
 
 #[tauri::command]
 pub async fn execute_script(
+    app_handle: tauri::AppHandle,
     state: State<'_, AppState>,
     device_id: String,
     script_code: String,
 ) -> Result<String, String> {
     dbg_log!("execute_script on device {}", device_id);
 
+    let port = state.config.lock().unwrap().settings.frida_port;
+
+    // 1. ADB port forward
+    state.add_log(format!("Port forwarding tcp:{} on {}", port, device_id));
+    let forward = StdCommand::new(&state.adb_path)
+        .arg("-s")
+        .arg(&device_id)
+        .arg("forward")
+        .arg(format!("tcp:{}", port))
+        .arg(format!("tcp:{}", port))
+        .output()
+        .map_err(|e| format!("Port forward failed: {}", e))?;
+
+    if !forward.status.success() {
+        let stderr = String::from_utf8_lossy(&forward.stderr);
+        return Err(format!("ADB port forward error: {}", stderr));
+    }
+    state.add_log("Port forward OK".to_string());
+
+    // 2. Write script to temp file
     let tmp_dir = std::env::temp_dir();
     let script_path = tmp_dir.join("re-frida-script.js");
     std::fs::write(&script_path, &script_code)
         .map_err(|e| format!("Failed to write script: {}", e))?;
 
-    state.add_log(format!("Executing script on {}", device_id));
+    let script_str = script_path.to_str().unwrap_or("");
+    state.add_log(format!("Executing script on {} (port {})", device_id, port));
 
-    let port = state.config.lock().unwrap().settings.frida_port;
-    let result = Command::new(&state.frida_path)
+    // 3. Spawn frida with piped I/O
+    let mut child = tokio::process::Command::new(&state.frida_path)
         .arg("-H")
         .arg(format!("127.0.0.1:{}", port))
         .arg("-n")
         .arg("Gadget")
         .arg("-l")
-        .arg(script_path.to_str().unwrap_or(""))
-        .output();
-
-    let _ = std::fs::remove_file(&script_path);
-
-    match result {
-        Ok(out) => {
-            let stdout = String::from_utf8_lossy(&out.stdout).to_string();
-            let stderr = String::from_utf8_lossy(&out.stderr).to_string();
-            dbg_log!("frida stdout: {}", stdout);
-            dbg_log!("frida stderr: {}", stderr);
-            if out.status.success() {
-                state.add_log("Script executed successfully".to_string());
-                Ok(if stdout.is_empty() { stderr } else { stdout })
-            } else {
-                let error_msg = if stderr.contains("No such file") || stderr.contains("not found") {
-                    format!("Frida not found. {}\n\n{}", DEFAULT_FRIDA_INSTALL, stderr)
-                } else {
-                    stderr
-                };
-                state.add_log(format!("Script error: {}", error_msg));
-                Err(error_msg)
-            }
-        }
-        Err(e) => {
-            let error_msg = if e.to_string().contains("No such file") || e.to_string().contains("not found") {
+        .arg(script_str)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| {
+            let _ = std::fs::remove_file(&script_path);
+            if e.to_string().contains("No such file") || e.to_string().contains("not found") {
                 format!("Frida not found. {}\n\n({})", DEFAULT_FRIDA_INSTALL, e)
             } else {
                 format!("frida failed: {}", e)
-            };
-            state.add_log(error_msg.clone());
-            Err(error_msg)
+            }
+        })?;
+
+    let stdout = child.stdout.take().ok_or("No stdout")?;
+    let stderr = child.stderr.take().ok_or("No stderr")?;
+
+    // 4. Read stdout/stderr concurrently, emit each line as event
+    let app_out = app_handle.clone();
+    let stdout_task = tokio::spawn(async move {
+        let mut reader = BufReader::new(stdout).lines();
+        let mut out = String::new();
+        while let Some(line) = reader.next_line().await.unwrap_or(None) {
+            out.push_str(&line);
+            out.push('\n');
+            let _ = app_out.emit("frida-line", serde_json::json!({
+                "line": line,
+                "source": "stdout"
+            }));
         }
+        out
+    });
+
+    let app_err = app_handle.clone();
+    let stderr_task = tokio::spawn(async move {
+        let mut reader = BufReader::new(stderr).lines();
+        let mut out = String::new();
+        while let Some(line) = reader.next_line().await.unwrap_or(None) {
+            out.push_str(&line);
+            out.push('\n');
+            let _ = app_err.emit("frida-line", serde_json::json!({
+                "line": line,
+                "source": "stderr"
+            }));
+        }
+        out
+    });
+
+    // 5. Wait for output readers to finish
+    let (stdout_result, stderr_result) = tokio::join!(stdout_task, stderr_task);
+    let stdout_out = stdout_result.unwrap_or_default();
+    let stderr_out = stderr_result.unwrap_or_default();
+
+    // 6. Wait for process to exit
+    let status = child.wait().await.map_err(|e| e.to_string())?;
+
+    let _ = std::fs::remove_file(&script_path);
+
+    let mut full_output = stdout_out.clone();
+    if !stderr_out.is_empty() {
+        if !full_output.is_empty() {
+            full_output.push('\n');
+        }
+        full_output.push_str(&stderr_out);
     }
+
+    if status.success() {
+        state.add_log("Script executed successfully".to_string());
+    } else {
+        let error_msg = if stderr_out.contains("No such file") || stderr_out.contains("not found") {
+            format!("Frida not found. {}\n\n{}", DEFAULT_FRIDA_INSTALL, stderr_out)
+        } else {
+            stderr_out
+        };
+        state.add_log(format!("Script finished with error: {}", error_msg));
+    }
+
+    let _ = app_handle.emit("frida-done", serde_json::json!({
+        "success": status.success(),
+    }));
+
+    Ok(full_output)
 }
 
 #[tauri::command]
@@ -145,7 +215,7 @@ pub async fn push_gadget(
     gadget_path: String,
 ) -> Result<String, String> {
     dbg_log!("push_gadget to {}", device_id);
-    let output = Command::new(&state.adb_path)
+    let output = StdCommand::new(&state.adb_path)
         .arg("-s")
         .arg(&device_id)
         .arg("push")
@@ -169,7 +239,7 @@ pub async fn list_packages(
     device_id: String,
 ) -> Result<Vec<String>, String> {
     dbg_log!("list_packages for {}", device_id);
-    let output = Command::new(&state.adb_path)
+    let output = StdCommand::new(&state.adb_path)
         .arg("-s")
         .arg(&device_id)
         .arg("shell")
@@ -199,7 +269,7 @@ pub async fn launch_app(
     package_id: String,
 ) -> Result<String, String> {
     dbg_log!("launch_app {} on {}", package_id, device_id);
-    let output = Command::new(&state.adb_path)
+    let output = StdCommand::new(&state.adb_path)
         .arg("-s")
         .arg(&device_id)
         .arg("shell")
@@ -228,7 +298,7 @@ pub async fn kill_app(
     package_id: String,
 ) -> Result<String, String> {
     dbg_log!("kill_app {} on {}", package_id, device_id);
-    let output = Command::new(&state.adb_path)
+    let output = StdCommand::new(&state.adb_path)
         .arg("-s")
         .arg(&device_id)
         .arg("shell")
