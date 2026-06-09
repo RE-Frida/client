@@ -65,7 +65,7 @@ impl WsClient {
     }
 
     pub async fn send_auth(&self, frame: AuthFrame) -> Result<Response, String> {
-        let id = uuid::Uuid::new_v4().to_string();
+        let id = frame.id.clone();
         let (resp_tx, resp_rx) = oneshot::channel();
         self.pending.lock().unwrap().insert(id.clone(), resp_tx);
 
