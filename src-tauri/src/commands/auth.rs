@@ -61,12 +61,7 @@ pub async fn start_login(state: State<'_, AppState>) -> Result<String, String> {
     auth.authenticated = true;
     auth.token = auth_result.token.clone();
     auth.username = auth_result.user.as_ref().map(|u| u.username.clone());
-    auth.avatar_url = auth_result.user.as_ref().and_then(|u| {
-        u.avatar.as_ref().map(|a| {
-            let ext = if a.starts_with("a_") { "gif" } else { "png" };
-            format!("https://cdn.discordapp.com/avatars/{}/{}.{}", u.id, a, ext)
-        })
-    });
+    auth.avatar_url = auth_result.user.as_ref().and_then(|u| u.avatar.clone());
 
     // Save auth to config
     let mut config = state.config.lock().unwrap();
