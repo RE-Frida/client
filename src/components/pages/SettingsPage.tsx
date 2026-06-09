@@ -49,6 +49,10 @@ export function SettingsPage() {
         { id: "tokyo-night", label: "Tokyo Night", icon: Palette },
         { id: "rose-pine", label: "Rose Pine", icon: Palette },
         { id: "kawaii", label: "Kawaii", icon: Palette },
+        { id: "nord", label: "Nord", icon: Palette },
+        { id: "gruvbox", label: "Gruvbox", icon: Palette },
+        { id: "dracula", label: "Dracula", icon: Palette },
+        { id: "solarized-dark", label: "Solarized", icon: Palette },
       ],
     },
   ];

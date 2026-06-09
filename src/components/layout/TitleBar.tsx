@@ -29,7 +29,10 @@ export function TitleBar() {
   return (
     <div className="flex h-8 select-none items-center justify-between border-b border-border bg-sidebar px-2">
       <div data-tauri-drag-region className="flex h-full flex-1 items-center gap-2">
-        <FridaLogo className="h-4 w-4 text-primary" />
+        <FridaLogo className="h-4 w-4" />
+        <span className="text-xs font-medium text-sidebar-foreground/80">
+          RE:Frida{version ? ` v${version}` : ""}
+        </span>
       </div>
       <div className="flex items-center gap-2">
         {version && (

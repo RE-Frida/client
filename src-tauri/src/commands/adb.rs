@@ -4,7 +4,6 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 
 use crate::state::{AppState, dbg_log};
 use crate::types::DeviceInfo;
-use crate::config::DEFAULT_FRIDA_INSTALL;
 
 #[tauri::command]
 pub async fn discover_devices(state: State<'_, AppState>) -> Result<Vec<DeviceInfo>, String> {
@@ -98,24 +97,22 @@ pub async fn execute_script(
     let script_str = script_path.to_str().unwrap_or("");
     state.add_log(format!("Executing script on {} via USB", device_id));
 
-    let mut child = tokio::process::Command::new(&state.frida_path)
+    let mut child = tokio::process::Command::new(&state.frida_inject_path)
         .arg("-D")
         .arg(&device_id)
         .arg("-n")
         .arg("Gadget")
-        .arg("-l")
+        .arg("-s")
         .arg(script_str)
-        .arg("-q")
-        .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| {
             let _ = std::fs::remove_file(&script_path);
             if e.to_string().contains("No such file") || e.to_string().contains("not found") {
-                format!("Frida not found. {}\n\n({})", DEFAULT_FRIDA_INSTALL, e)
+                "Frida not found.\n\nInstall: pip install frida-tools".to_string()
             } else {
-                format!("frida failed: {}", e)
+                format!("frida-inject failed: {}", e)
             }
         })?;
 
@@ -174,12 +171,7 @@ pub async fn execute_script(
     if status.success() {
         state.add_log("Script executed successfully".to_string());
     } else {
-        let error_msg = if stderr_out.contains("No such file") || stderr_out.contains("not found") {
-            format!("Frida not found. {}\n\n{}", DEFAULT_FRIDA_INSTALL, stderr_out)
-        } else {
-            stderr_out
-        };
-        state.add_log(format!("Script finished with error: {}", error_msg));
+        state.add_log(format!("Script finished with error: {}", stderr_out));
     }
 
     let _ = app_handle.emit("frida-done", serde_json::json!({

@@ -93,6 +93,7 @@ pub struct AppState {
     pub auth: Arc<Mutex<AuthState>>,
     pub adb_path: String,
     pub frida_path: String,
+    pub frida_inject_path: String,
     pub(crate) ws: Arc<RwLock<Option<WsClient>>>,
     pub connected: Arc<Mutex<bool>>,
 }
@@ -101,9 +102,11 @@ impl AppState {
     pub fn new() -> Self {
         let adb_path = find_binary("adb");
         let frida_path = find_binary("frida");
+        let frida_inject_path = find_binary("frida-inject");
         let config = load_config();
         dbg_log!("ADB path: {}", adb_path);
         dbg_log!("Frida path: {}", frida_path);
+        dbg_log!("Frida-inject path: {}", frida_inject_path);
 
         // Load saved auth token from config
         let auth = AuthState {
@@ -119,6 +122,7 @@ impl AppState {
             auth: Arc::new(Mutex::new(auth)),
             adb_path,
             frida_path,
+            frida_inject_path,
             ws: Arc::new(RwLock::new(None)),
             connected: Arc::new(Mutex::new(false)),
         }

@@ -214,6 +214,126 @@
   --color-warning: #fbf8cc;
 }
 
+[data-theme="nord"] {
+  --color-background: #2e3440;
+  --color-foreground: #d8dee9;
+  --color-card: #3b4252;
+  --color-card-foreground: #d8dee9;
+  --color-popover: #3b4252;
+  --color-popover-foreground: #d8dee9;
+  --color-primary: #88c0d0;
+  --color-primary-foreground: #2e3440;
+  --color-secondary: #434c5e;
+  --color-secondary-foreground: #d8dee9;
+  --color-muted: #434c5e;
+  --color-muted-foreground: #81a1c1;
+  --color-accent: #434c5e;
+  --color-accent-foreground: #d8dee9;
+  --color-destructive: #bf616a;
+  --color-destructive-foreground: #2e3440;
+  --color-border: #4c566a;
+  --color-input: #4c566a;
+  --color-ring: #88c0d0;
+  --color-sidebar: #242933;
+  --color-sidebar-foreground: #d8dee9;
+  --color-sidebar-accent: #434c5e;
+  --color-sidebar-accent-foreground: #d8dee9;
+  --color-sidebar-border: #4c566a;
+  --color-sidebar-ring: #88c0d0;
+  --color-success: #a3be8c;
+  --color-warning: #ebcb8b;
+}
+
+[data-theme="gruvbox"] {
+  --color-background: #282828;
+  --color-foreground: #ebdbb2;
+  --color-card: #32302f;
+  --color-card-foreground: #ebdbb2;
+  --color-popover: #32302f;
+  --color-popover-foreground: #ebdbb2;
+  --color-primary: #d79921;
+  --color-primary-foreground: #282828;
+  --color-secondary: #3c3836;
+  --color-secondary-foreground: #ebdbb2;
+  --color-muted: #3c3836;
+  --color-muted-foreground: #a89984;
+  --color-accent: #3c3836;
+  --color-accent-foreground: #ebdbb2;
+  --color-destructive: #cc241d;
+  --color-destructive-foreground: #282828;
+  --color-border: #504945;
+  --color-input: #504945;
+  --color-ring: #d79921;
+  --color-sidebar: #1d2021;
+  --color-sidebar-foreground: #ebdbb2;
+  --color-sidebar-accent: #3c3836;
+  --color-sidebar-accent-foreground: #ebdbb2;
+  --color-sidebar-border: #504945;
+  --color-sidebar-ring: #d79921;
+  --color-success: #98971a;
+  --color-warning: #d65d0e;
+}
+
+[data-theme="dracula"] {
+  --color-background: #282a36;
+  --color-foreground: #f8f8f2;
+  --color-card: #21222c;
+  --color-card-foreground: #f8f8f2;
+  --color-popover: #21222c;
+  --color-popover-foreground: #f8f8f2;
+  --color-primary: #bd93f9;
+  --color-primary-foreground: #282a36;
+  --color-secondary: #343746;
+  --color-secondary-foreground: #f8f8f2;
+  --color-muted: #343746;
+  --color-muted-foreground: #6272a4;
+  --color-accent: #343746;
+  --color-accent-foreground: #f8f8f2;
+  --color-destructive: #ff5555;
+  --color-destructive-foreground: #282a36;
+  --color-border: #44475a;
+  --color-input: #44475a;
+  --color-ring: #bd93f9;
+  --color-sidebar: #1e1f29;
+  --color-sidebar-foreground: #f8f8f2;
+  --color-sidebar-accent: #343746;
+  --color-sidebar-accent-foreground: #f8f8f2;
+  --color-sidebar-border: #44475a;
+  --color-sidebar-ring: #bd93f9;
+  --color-success: #50fa7b;
+  --color-warning: #f1fa8c;
+}
+
+[data-theme="solarized-dark"] {
+  --color-background: #002b36;
+  --color-foreground: #839496;
+  --color-card: #073642;
+  --color-card-foreground: #839496;
+  --color-popover: #073642;
+  --color-popover-foreground: #839496;
+  --color-primary: #268bd2;
+  --color-primary-foreground: #002b36;
+  --color-secondary: #073642;
+  --color-secondary-foreground: #839496;
+  --color-muted: #073642;
+  --color-muted-foreground: #657b83;
+  --color-accent: #073642;
+  --color-accent-foreground: #839496;
+  --color-destructive: #dc322f;
+  --color-destructive-foreground: #002b36;
+  --color-border: #094552;
+  --color-input: #094552;
+  --color-ring: #268bd2;
+  --color-sidebar: #00202a;
+  --color-sidebar-foreground: #839496;
+  --color-sidebar-accent: #073642;
+  --color-sidebar-accent-foreground: #839496;
+  --color-sidebar-border: #094552;
+  --color-sidebar-ring: #268bd2;
+  --color-success: #859900;
+  --color-warning: #b58900;
+}
+
 @layer base {
   * {
     @apply border-border;
@@ -239,5 +359,33 @@
   .cm-editor .cm-scroller {
     font-family: "JetBrains Mono", "Fira Code", "Consolas", monospace;
     font-size: 13px;
+  }
+
+  @keyframes pulse-ring {
+    0% { transform: scale(1); opacity: 0.5; }
+    50% { transform: scale(2); opacity: 0.15; }
+    100% { transform: scale(1); opacity: 0.5; }
+  }
+
+  @keyframes pulse-ring-subtle {
+    0% { transform: scale(1); opacity: 0.4; }
+    100% { transform: scale(1.6); opacity: 0; }
+  }
+
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-pulse-ring {
+    animation: pulse-ring 2s ease-in-out infinite;
+  }
+
+  .animate-pulse-ring-subtle {
+    animation: pulse-ring-subtle 1.5s ease-out infinite;
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.3s ease-out;
   }
 }

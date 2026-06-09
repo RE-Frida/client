@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import {
   Smartphone, RefreshCw, ChevronDown, Play, Square, Send,
-  FileCode2, Loader2, Package,
+  FileCode2, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   getConfig, discoverDevices, startSession, executeScript,
   launchApp, killApp,
@@ -15,7 +14,7 @@ import { listen } from "@tauri-apps/api/event";
 import CodeMirror from "@uiw/react-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
 import { oneDark } from "@codemirror/theme-one-dark";
-import type { DeviceInfo, AppConfig } from "@/types";
+import type { DeviceInfo } from "@/types";
 
 interface InjectionPageProps {
   selectedDevice: string | null;
@@ -115,107 +114,74 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
   };
 
   return (
-    <div className="flex h-full flex-col gap-4 p-4">
-      <div>
-        <h2 className="text-2xl font-bold">Injection</h2>
-        <p className="text-sm text-muted-foreground">Select a script and target device to inject</p>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Smartphone className="h-4 w-4" />
-              Device
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="relative">
-              <select
-                value={selectedDevice || ""}
-                onChange={(e) => onDeviceChange(e.target.value || null)}
-                className="w-full appearance-none rounded-md border border-border bg-background py-2 pl-3 pr-8 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-              >
-                {devices.length === 0 ? (
-                  <option value="">No devices found</option>
-                ) : (
-                  devices.map((dev) => (
-                    <option key={dev.id} value={dev.id}>
-                      {dev.model || dev.id} ({dev.status})
-                    </option>
-                  ))
-                )}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">
-                {devices.length} device{devices.length !== 1 ? "s" : ""} found
-              </span>
-              <Button variant="ghost" size="sm" onClick={refreshDevices} disabled={refreshing}>
-                <RefreshCw className={"mr-1 h-3 w-3" + (refreshing ? " animate-spin" : "")} />
-                Refresh
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <Package className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Target: {pkg}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <FileCode2 className="h-4 w-4" />
-              Script
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button variant="outline" onClick={handleSelectScript}>
-              <FileCode2 className="mr-2 h-4 w-4" />
-              {scriptPath ? "Change Script" : "Select Script"}
-            </Button>
-            {scriptPath && (
-              <p className="text-xs text-muted-foreground truncate">{scriptPath}</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="flex-1 flex flex-col min-h-0">
-        <CardHeader className="pb-3 shrink-0">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Send className="h-4 w-4" />
-              Execute
-            </CardTitle>
-            <div className="flex gap-2">
-              <Button size="sm" onClick={handleStart} disabled={!selectedDevice}>
-                <Play className="mr-1 h-3 w-3" />
-                Start
-              </Button>
-              <Button variant="destructive" size="sm" onClick={handleStop} disabled={!selectedDevice}>
-                <Square className="mr-1 h-3 w-3" />
-                Stop
-              </Button>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={handleExecute}
-                disabled={!selectedDevice || !scriptCode.trim() || running}
-              >
-                {running ? (
-                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                ) : (
-                  <Send className="mr-1 h-3 w-3" />
-                )}
-                Execute
-              </Button>
-            </div>
+    <div className="flex h-full flex-col p-4">
+      {/* Top toolbar */}
+      <div className="flex shrink-0 items-center gap-3 rounded-lg border border-border bg-card p-3">
+        <div className="flex items-center gap-2">
+          <Smartphone className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div className="relative">
+            <select
+              value={selectedDevice || ""}
+              onChange={(e) => onDeviceChange(e.target.value || null)}
+              className="appearance-none rounded-md border border-border bg-background py-1.5 pl-2 pr-6 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              {devices.length === 0 ? (
+                <option value="">No devices</option>
+              ) : (
+                devices.map((dev) => (
+                  <option key={dev.id} value={dev.id}>
+                    {dev.model || dev.id}
+                  </option>
+                ))
+              )}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-1 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
           </div>
-        </CardHeader>
-        <CardContent ref={outputRef} className="flex-1 min-h-0 p-0 border-t border-border overflow-hidden">
+          <Button variant="ghost" size="sm" onClick={refreshDevices} disabled={refreshing} className="h-7 px-1.5">
+            <RefreshCw className={"h-3 w-3" + (refreshing ? " animate-spin" : "")} />
+          </Button>
+        </div>
+
+        <div className="text-xs text-muted-foreground/50">|</div>
+
+        <div className="flex items-center gap-2">
+          <FileCode2 className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Button variant="outline" size="sm" onClick={handleSelectScript} className="h-7 text-xs">
+            {scriptPath ? "Change Script" : "Select Script"}
+          </Button>
+          {scriptPath && (
+            <span className="max-w-[200px] truncate text-xs text-muted-foreground">{scriptPath}</span>
+          )}
+        </div>
+
+        <div className="ml-auto flex items-center gap-1.5">
+          <Button size="sm" onClick={handleStart} disabled={!selectedDevice} className="h-7 text-xs px-2">
+            <Play className="mr-1 h-3 w-3" />
+            Start
+          </Button>
+          <Button variant="destructive" size="sm" onClick={handleStop} disabled={!selectedDevice} className="h-7 text-xs px-2">
+            <Square className="mr-1 h-3 w-3" />
+            Stop
+          </Button>
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleExecute}
+            disabled={!selectedDevice || !scriptCode.trim() || running}
+            className="h-7 text-xs px-2"
+          >
+            {running ? (
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+            ) : (
+              <Send className="mr-1 h-3 w-3" />
+            )}
+            Execute
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex-1 min-h-0 mt-3">
+        <div ref={outputRef} className="h-full rounded-lg border border-border overflow-hidden">
           <CodeMirror
             value={output || "// Output will appear here..."}
             height="100%"
@@ -229,8 +195,8 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
               highlightActiveLineGutter: false,
             }}
           />
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

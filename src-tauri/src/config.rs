@@ -1,7 +1,6 @@
 use crate::types::AppConfig;
 
 pub const DEFAULT_PACKAGE: &str = "org.refrida.apk";
-pub const DEFAULT_FRIDA_INSTALL: &str = "Install Frida: pip install frida";
 
 pub fn config_path() -> std::path::PathBuf {
     let dir = dirs::config_dir()
