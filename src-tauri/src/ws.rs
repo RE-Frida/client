@@ -169,14 +169,12 @@ pub async fn connect_ws(state: AppState) {
                     if let Some(data) = &resp.data {
                         if let Ok(auth_result) = serde_json::from_value::<AuthResult>(data.clone())
                         {
-                            if auth_result.is_guild_member {
-                                let mut auth = auth_state.lock().unwrap();
-                                auth.authenticated = true;
-                                auth.username =
-                                    auth_result.user.as_ref().map(|u| u.username.clone());
-                                auth.avatar_url =
-                                    auth_result.user.as_ref().and_then(|u| u.avatar.clone());
-                            }
+                            let mut auth = auth_state.lock().unwrap();
+                            auth.authenticated = auth_result.is_guild_member;
+                            auth.username =
+                                auth_result.user.as_ref().map(|u| u.username.clone());
+                            auth.avatar_url =
+                                auth_result.user.as_ref().and_then(|u| u.avatar.clone());
                         }
                     }
                 }
