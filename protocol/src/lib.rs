@@ -37,8 +37,11 @@ pub struct Response {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthFrame {
     pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub discord_code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub discord_redirect_uri: Option<String>,
 }
 
