@@ -21,10 +21,8 @@ function applyTheme(theme: string) {
 
 export function SettingsPage() {
   const [config, setConfig] = useState<AppConfig>({
-    theme: "dark",
-    frida_port: 27042,
-    custom_package: "",
-    advanced_mode: false,
+    settings: { theme: "dark", frida_port: 27042, custom_package: "", advanced_mode: false },
+    auth: {},
   });
   const [saving, setSaving] = useState(false);
 
@@ -58,24 +56,26 @@ export function SettingsPage() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setConfig({ ...config, advanced_mode: !config.advanced_mode })}
+            onClick={() =>
+              setConfig({ ...config, settings: { ...config.settings, advanced_mode: !config.settings.advanced_mode } })
+            }
             className="flex items-center gap-2 text-sm"
           >
-            <span className={config.advanced_mode ? "text-muted-foreground" : "font-medium"}>
+            <span className={config.settings.advanced_mode ? "text-muted-foreground" : "font-medium"}>
               Basic
             </span>
             <div
               className={`relative h-5 w-9 rounded-full transition-colors ${
-                config.advanced_mode ? "bg-primary" : "bg-muted"
+                config.settings.advanced_mode ? "bg-primary" : "bg-muted"
               }`}
             >
               <div
                 className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
-                  config.advanced_mode ? "translate-x-4" : "translate-x-0.5"
+                  config.settings.advanced_mode ? "translate-x-4" : "translate-x-0.5"
                 }`}
               />
             </div>
-            <span className={config.advanced_mode ? "font-medium" : "text-muted-foreground"}>
+            <span className={config.settings.advanced_mode ? "font-medium" : "text-muted-foreground"}>
               Advanced
             </span>
           </button>
@@ -103,12 +103,12 @@ export function SettingsPage() {
                   <button
                     key={theme.id}
                     onClick={() => {
-                      setConfig({ ...config, theme: theme.id });
+                      setConfig({ ...config, settings: { ...config.settings, theme: theme.id } });
                       applyTheme(theme.id);
                     }}
                     className={
                       "flex flex-1 flex-col items-center gap-2 rounded-lg border p-4 text-sm transition-colors " +
-                      (config.theme === theme.id
+                      (config.settings.theme === theme.id
                         ? "border-primary bg-primary/5"
                         : "border-border hover:bg-accent")
                     }
@@ -122,7 +122,7 @@ export function SettingsPage() {
           </CardContent>
         </Card>
 
-        {config.advanced_mode && (
+        {config.settings.advanced_mode && (
           <>
             <Card>
               <CardHeader>
@@ -139,9 +139,12 @@ export function SettingsPage() {
                   </label>
                   <Input
                     type="number"
-                    value={config.frida_port}
+                    value={config.settings.frida_port}
                     onChange={(e) =>
-                      setConfig({ ...config, frida_port: parseInt(e.target.value) || 27042 })
+                      setConfig({
+                        ...config,
+                        settings: { ...config.settings, frida_port: parseInt(e.target.value) || 27042 },
+                      })
                     }
                     placeholder="27042"
                   />
@@ -163,9 +166,12 @@ export function SettingsPage() {
                     Package ID
                   </label>
                   <Input
-                    value={config.custom_package}
+                    value={config.settings.custom_package}
                     onChange={(e) =>
-                      setConfig({ ...config, custom_package: e.target.value })
+                      setConfig({
+                        ...config,
+                        settings: { ...config.settings, custom_package: e.target.value },
+                      })
                     }
                     placeholder="com.target.app"
                   />

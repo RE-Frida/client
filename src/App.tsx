@@ -36,7 +36,7 @@ export default function App() {
 
   useEffect(() => {
     pollAuth();
-    getConfig().then((config) => applyTheme(config.theme)).catch(() => {});
+    getConfig().then((config) => applyTheme(config.settings.theme)).catch(() => {});
     const authPoll = setInterval(pollAuth, 2000);
     // After 10 seconds of no connection, show failed screen
     const failTimer = setTimeout(() => {

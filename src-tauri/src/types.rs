@@ -9,29 +9,49 @@ pub struct DeviceInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
+    #[serde(default)]
+    pub settings: AppSettings,
+    #[serde(default)]
+    pub auth: ConfigAuth,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppSettings {
     pub theme: String,
     pub frida_port: u16,
     pub custom_package: String,
     pub advanced_mode: bool,
-    #[serde(default)]
-    pub auth_token: Option<String>,
-    #[serde(default)]
-    pub auth_username: Option<String>,
-    #[serde(default)]
-    pub auth_avatar_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigAuth {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
 }
 
 impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            settings: AppSettings::default(),
+            auth: ConfigAuth::default(),
+        }
+    }
+}
+
+impl Default for AppSettings {
     fn default() -> Self {
         Self {
             theme: "dark".to_string(),
             frida_port: 27042,
             custom_package: "com.target.app".to_string(),
             advanced_mode: false,
-            auth_token: None,
-            auth_username: None,
-            auth_avatar_url: None,
         }
+    }
+}
+
+impl Default for ConfigAuth {
+    fn default() -> Self {
+        Self { token: None }
     }
 }
 

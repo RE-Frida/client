@@ -5,13 +5,19 @@ export interface DeviceInfo {
 }
 
 export interface AppConfig {
+  settings: AppSettings;
+  auth: ConfigAuth;
+}
+
+export interface AppSettings {
   theme: string;
   frida_port: number;
   custom_package: string;
   advanced_mode: boolean;
-  auth_token?: string;
-  auth_username?: string;
-  auth_avatar_url?: string;
+}
+
+export interface ConfigAuth {
+  token?: string;
 }
 
 export interface ScriptData {

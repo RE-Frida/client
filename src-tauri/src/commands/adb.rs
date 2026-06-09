@@ -51,7 +51,7 @@ pub async fn discover_devices(state: State<'_, AppState>) -> Result<Vec<DeviceIn
 
 #[tauri::command]
 pub async fn start_session(state: State<'_, AppState>, device_id: String) -> Result<String, String> {
-    let port = state.config.lock().unwrap().frida_port;
+    let port = state.config.lock().unwrap().settings.frida_port;
     dbg_log!("start_session on device {} port {}", device_id, port);
 
     let output = Command::new(&state.adb_path)
@@ -96,7 +96,7 @@ pub async fn execute_script(
     state.add_log(format!("Executing script on {}", device_id));
 
     let result = if use_gadget {
-        let port = state.config.lock().unwrap().frida_port;
+        let port = state.config.lock().unwrap().settings.frida_port;
         Command::new(&state.frida_path)
             .arg("-H")
             .arg(format!("127.0.0.1:{}", port))

@@ -5,13 +5,10 @@ export function TitleBar() {
   const appWindow = getCurrentWindow();
 
   return (
-    <div
-      data-tauri-drag-region
-      className="flex h-8 select-none items-center justify-between border-b border-border bg-sidebar px-2"
-    >
-      <div className="flex items-center gap-2" data-tauri-drag-region>
+    <div className="flex h-8 select-none items-center justify-between border-b border-border bg-sidebar px-2">
+      <div data-tauri-drag-region className="flex h-full flex-1 items-center gap-2">
         <Zap className="h-4 w-4 text-primary" />
-        <span className="text-xs font-medium text-sidebar-foreground" data-tauri-drag-region>
+        <span className="text-xs font-medium text-sidebar-foreground">
           RE:Frida
         </span>
       </div>

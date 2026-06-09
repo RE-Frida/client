@@ -63,11 +63,9 @@ pub async fn start_login(state: State<'_, AppState>) -> Result<String, String> {
     auth.username = auth_result.user.as_ref().map(|u| u.username.clone());
     auth.avatar_url = auth_result.user.as_ref().and_then(|u| u.avatar.clone());
 
-    // Save auth to config
+    // Save auth token to config
     let mut config = state.config.lock().unwrap();
-    config.auth_token = auth.token.clone();
-    config.auth_username = auth.username.clone();
-    config.auth_avatar_url = auth.avatar_url.clone();
+    config.auth.token = auth.token.clone();
     crate::config::save_config_to_disk(&config);
 
     state.add_log(format!("Logged in as {}", auth.username.as_deref().unwrap_or("unknown")));
@@ -88,11 +86,9 @@ pub async fn logout(state: State<'_, AppState>) -> Result<(), String> {
     auth.avatar_url = None;
     auth.token = None;
 
-    // Clear auth from config
+    // Clear auth token from config
     let mut config = state.config.lock().unwrap();
-    config.auth_token = None;
-    config.auth_username = None;
-    config.auth_avatar_url = None;
+    config.auth.token = None;
     crate::config::save_config_to_disk(&config);
 
     state.add_log("Logged out".to_string());

@@ -81,4 +81,13 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  .cm-editor {
+    height: 100%;
+  }
+
+  .cm-editor .cm-scroller {
+    font-family: "JetBrains Mono", "Fira Code", "Consolas", monospace;
+    font-size: 13px;
+  }
 }

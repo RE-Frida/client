@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Smartphone, RefreshCw, ChevronDown, Play, Square, Send,
   FileCode2, Loader2, Package,
@@ -11,6 +11,9 @@ import {
 } from "@/hooks/tauri";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readTextFile } from "@tauri-apps/plugin-fs";
+import CodeMirror from "@uiw/react-codemirror";
+import { javascript } from "@codemirror/lang-javascript";
+import { oneDark } from "@codemirror/theme-one-dark";
 import type { DeviceInfo, AppConfig } from "@/types";
 
 interface InjectionPageProps {
@@ -26,9 +29,11 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
   const [scriptCode, setScriptCode] = useState("");
   const [output, setOutput] = useState("");
   const [running, setRunning] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState("dark");
+  const outputRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    getConfig().then(setConfig).catch(() => {});
+    getConfig().then((c) => { setConfig(c); setCurrentTheme(c.theme); }).catch(() => {});
     refreshDevices();
   }, []);
 
@@ -47,7 +52,7 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
     }
   };
 
-  const pkg = config?.custom_package || "com.target.app";
+  const pkg = config?.settings.custom_package || "com.target.app";
 
   const handleSelectScript = async () => {
     const selected = await open({
@@ -168,8 +173,8 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
         </Card>
       </div>
 
-      <Card className="flex-1 flex flex-col">
-        <CardHeader className="pb-3">
+      <Card className="flex-1 flex flex-col min-h-0">
+        <CardHeader className="pb-3 shrink-0">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-base">
               <Send className="h-4 w-4" />
@@ -200,22 +205,20 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
             </div>
           </div>
         </CardHeader>
-        <CardContent className="flex-1 flex flex-col min-h-0">
-          <div className="text-xs font-medium text-muted-foreground mb-1">Script Code</div>
-          <textarea
-            value={scriptCode}
-            onChange={(e) => setScriptCode(e.target.value)}
-            placeholder="// Paste or select a script..."
-            className="w-full min-h-[120px] resize-y rounded-md border border-border bg-background p-3 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-primary"
+        <CardContent ref={outputRef} className="flex-1 min-h-0 p-0 border-t border-border overflow-hidden">
+          <CodeMirror
+            value={output || "// Output will appear here..."}
+            height="100%"
+            theme={currentTheme === "light" ? undefined : oneDark}
+            extensions={[javascript()]}
+            readOnly
+            basicSetup={{
+              lineNumbers: false,
+              foldGutter: false,
+              highlightActiveLine: false,
+              highlightActiveLineGutter: false,
+            }}
           />
-          {output && (
-            <div className="mt-3">
-              <div className="text-xs font-medium text-muted-foreground mb-1">Output</div>
-              <pre className="max-h-[200px] overflow-auto rounded-md bg-muted p-3 text-xs font-mono whitespace-pre-wrap">
-                {output}
-              </pre>
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>

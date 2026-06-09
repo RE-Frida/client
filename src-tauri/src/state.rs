@@ -105,12 +105,12 @@ impl AppState {
         dbg_log!("ADB path: {}", adb_path);
         dbg_log!("Frida path: {}", frida_path);
 
-        // Load saved auth from config
+        // Load saved auth token from config
         let auth = AuthState {
-            authenticated: config.auth_token.is_some(),
-            username: config.auth_username.clone(),
-            avatar_url: config.auth_avatar_url.clone(),
-            token: config.auth_token.clone(),
+            authenticated: config.auth.token.is_some(),
+            username: None,
+            avatar_url: None,
+            token: config.auth.token.clone(),
         };
 
         Self {
