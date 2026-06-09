@@ -51,7 +51,7 @@ impl Default for AppSettings {
             frida_port: 27042,
             custom_package: DEFAULT_PACKAGE.to_string(),
             advanced_mode: false,
-            accent_color: None,
+            accent_color: Some("#ef6456".to_string()),
             background_image: None,
         }
     }

@@ -207,7 +207,7 @@ export function SettingsPage() {
                   ))}
                   <input
                     type="color"
-                    value={config.settings.accent_color || "#6366f1"}
+                    value={config.settings.accent_color || "#ef6456"}
                     onChange={(e) => {
                       const newSettings = { ...config.settings, accent_color: e.target.value };
                       setConfig({ ...config, settings: newSettings });
@@ -215,12 +215,12 @@ export function SettingsPage() {
                     }}
                     className="h-7 w-7 cursor-pointer rounded-full border-0 p-0"
                   />
-                  {config.settings.accent_color && (
+                  {config.settings.accent_color && config.settings.accent_color !== "#ef6456" && (
                     <button
                       onClick={() => {
-                        const newSettings = { ...config.settings, accent_color: undefined };
+                        const newSettings = { ...config.settings, accent_color: "#ef6456" };
                         setConfig({ ...config, settings: newSettings });
-                        applyTheme(config.settings.theme, undefined, newSettings.background_image);
+                        applyTheme(config.settings.theme, "#ef6456", newSettings.background_image);
                       }}
                       className="text-xs text-muted-foreground hover:text-foreground ml-1"
                     >
