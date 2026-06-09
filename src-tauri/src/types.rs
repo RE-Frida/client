@@ -7,6 +7,8 @@ pub struct DeviceInfo {
     pub status: String,
 }
 
+use crate::config::DEFAULT_PACKAGE;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     #[serde(default)]
@@ -43,7 +45,7 @@ impl Default for AppSettings {
         Self {
             theme: "dark".to_string(),
             frida_port: 27042,
-            custom_package: "org.refrida.apk".to_string(),
+            custom_package: DEFAULT_PACKAGE.to_string(),
             advanced_mode: false,
         }
     }

@@ -1,5 +1,7 @@
 use crate::types::AppConfig;
 
+pub const DEFAULT_PACKAGE: &str = "org.refrida.apk";
+
 pub fn config_path() -> std::path::PathBuf {
     let dir = dirs::config_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
