@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   LayoutDashboard,
   Store,
@@ -6,6 +7,8 @@ import {
   Settings,
   LogOut,
   User,
+  PanelLeftOpen,
+  PanelLeftClose,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { logout } from "@/hooks/tauri";
@@ -32,6 +35,17 @@ export function Sidebar({
   auth,
   onLogout,
 }: SidebarProps) {
+  const [collapsed, setCollapsed] = useState(() =>
+    localStorage.getItem("sidebar_collapsed") === "true"
+  );
+
+  const toggle = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("sidebar_collapsed", String(next));
+      return next;
+    });
+  };
 
   const handleLogout = async () => {
     try {
@@ -43,9 +57,34 @@ export function Sidebar({
   };
 
   return (
-    <aside className="flex h-full w-48 flex-col border-r border-sidebar-border bg-sidebar">
+    <aside
+      className={cn(
+        "flex h-full flex-col border-r border-sidebar-border bg-sidebar transition-all duration-200",
+        collapsed ? "w-14" : "w-48"
+      )}
+    >
+      {/* Toggle */}
+      <div
+        className={cn(
+          "flex py-2",
+          collapsed ? "justify-center" : "justify-end px-2"
+        )}
+      >
+        <button
+          onClick={toggle}
+          className="rounded-md p-1 text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {collapsed ? (
+            <PanelLeftOpen className="h-4 w-4" />
+          ) : (
+            <PanelLeftClose className="h-4 w-4" />
+          )}
+        </button>
+      </div>
+
       {/* Navigation */}
-      <nav className="flex-1 space-y-0.5 px-2 py-2">
+      <nav className="flex-1 space-y-0.5 px-1.5">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -54,22 +93,31 @@ export function Sidebar({
               key={item.id}
               onClick={() => onTabChange(item.id)}
               className={cn(
-                "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors",
+                "flex w-full items-center rounded-lg text-sm font-medium transition-colors",
+                collapsed
+                  ? "justify-center px-0 py-2"
+                  : "gap-2.5 px-2.5 py-1.5",
                 isActive
                   ? "bg-sidebar-accent text-sidebar-accent-foreground"
                   : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
               )}
+              title={collapsed ? item.label : undefined}
             >
-              <Icon className="h-4 w-4" />
-              {item.label}
+              <Icon className="h-4 w-4 shrink-0" />
+              {!collapsed && item.label}
             </button>
           );
         })}
       </nav>
 
       {/* Auth Section */}
-      <div className="border-t border-sidebar-border px-3 py-2">
-        <div className="flex items-center gap-2">
+      <div className="border-t border-sidebar-border px-1.5 py-2">
+        <div
+          className={cn(
+            "flex items-center",
+            collapsed ? "justify-center" : "gap-2"
+          )}
+        >
           <div className="relative h-6 w-6 shrink-0">
             {auth.avatar_url ? (
               <img
@@ -86,16 +134,20 @@ export function Sidebar({
               <User className="h-3 w-3 text-muted-foreground" />
             </div>
           </div>
-          <span className="flex-1 truncate text-xs font-medium text-sidebar-foreground">
-            {auth.username}
-          </span>
-          <button
-            onClick={handleLogout}
-            className="rounded p-1 text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-            title="Logout"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-          </button>
+          {!collapsed && (
+            <>
+              <span className="flex-1 truncate text-xs font-medium text-sidebar-foreground">
+                {auth.username}
+              </span>
+              <button
+                onClick={handleLogout}
+                className="rounded p-1 text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                title="Logout"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
         </div>
       </div>
     </aside>
