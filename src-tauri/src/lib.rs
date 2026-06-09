@@ -12,6 +12,13 @@ use tauri::Manager;
 pub use state::AppState;
 pub use types::{AppConfig, AuthState, DeviceInfo};
 
+// ─── File Operations ─────────────────────────────────────────────
+
+#[tauri::command]
+async fn open_folder(path: String) -> Result<(), String> {
+    open::that(&path).map_err(|e| format!("Failed to open folder: {}", e))
+}
+
 // ─── Connection Status ──────────────────────────────────────────
 
 #[tauri::command]
@@ -140,6 +147,7 @@ pub fn run() {
             commands::projects::update_project_file,
             is_connected,
             reconnect,
+            open_folder,
             get_app_version,
             is_debug_build,
             get_security_report,

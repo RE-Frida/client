@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Search, Download, User, Plus, Trash2, Package,
   X, Tag, FileCode, Loader2, CheckCircle2, ChevronDown,
-  Image, AlertCircle, ArrowLeft, FolderOpen, Upload,
+  Image, AlertCircle, ArrowLeft, FolderOpen, Upload, RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,12 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
-import { open as openShell } from "@tauri-apps/plugin-shell";
 import {
   listProjects, createProject, deleteProject, downloadProject,
   listProjectFiles, getProjectFile, getAuthState,
   isProjectInstalled, getProjectDiff, updateProjectFromServer,
-  getProjectInstallPath, publishProject,
+  getProjectInstallPath, publishProject, openFolder,
 } from "@/hooks/tauri";
 import type { ProjectData, AuthState } from "@/types";
 
@@ -181,7 +180,7 @@ export function Marketplace() {
   const handleOpenFolder = async (project: ProjectData) => {
     try {
       const path = await getProjectInstallPath(project.id);
-      await openShell(path);
+      await openFolder(path);
     } catch (e) {
       console.error("Failed to open folder:", e);
     }
@@ -412,6 +411,10 @@ export function Marketplace() {
               <Button variant="ghost" size="sm" onClick={closeDetail}>
                 <ArrowLeft className="mr-1.5 h-4 w-4" />
                 Back to Projects
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => openDetail(viewProject)}>
+                <RefreshCw className="mr-1.5 h-3 w-3" />
+                Refresh
               </Button>
               {isOwner(viewProject) && (
                 <Button

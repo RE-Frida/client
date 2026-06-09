@@ -380,3 +380,9 @@ export async function updateProjectFile(
 ): Promise<void> {
   return invoke("update_project_file", { projectId, path, content });
 }
+
+// ─── File System ─────────────────────────────────────────────────
+
+export async function openFolder(path: string): Promise<void> {
+  return invoke("open_folder", { path });
+}
