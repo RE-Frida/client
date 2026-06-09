@@ -1,16 +1,15 @@
-import { useState, useEffect } from "react";
 import {
   LayoutDashboard,
   Store,
   Send,
   ScrollText,
   Settings,
-  Zap,
   LogOut,
   User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { logout, getAppVersion } from "@/hooks/tauri";
+import { logout } from "@/hooks/tauri";
+import { FridaLogo } from "@/components/ui/FridaLogo";
 import type { TabId, AuthState } from "@/types";
 
 interface SidebarProps {
@@ -34,11 +33,6 @@ export function Sidebar({
   auth,
   onLogout,
 }: SidebarProps) {
-  const [version, setVersion] = useState("");
-
-  useEffect(() => {
-    getAppVersion().then(setVersion).catch(() => setVersion("0.0.0"));
-  }, []);
 
   const handleLogout = async () => {
     try {
@@ -52,14 +46,8 @@ export function Sidebar({
   return (
     <aside className="flex h-full w-48 flex-col border-r border-sidebar-border bg-sidebar">
       {/* Logo */}
-      <div className="flex items-center gap-2 border-b border-sidebar-border px-3 py-3">
-        <Zap className="h-5 w-5 text-primary" />
-        <div>
-          <h1 className="text-sm font-bold text-sidebar-foreground">RE:Frida</h1>
-          {version && (
-            <p className="text-[10px] text-muted-foreground">v{version}</p>
-          )}
-        </div>
+      <div className="flex items-center justify-center border-b border-sidebar-border py-3">
+        <FridaLogo className="h-6 w-6 text-primary" />
       </div>
 
       {/* Navigation */}

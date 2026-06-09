@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Zap, Loader2, LogIn, AlertCircle, RefreshCw } from "lucide-react";
+import { Loader2, LogIn, AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { startLogin } from "@/hooks/tauri";
+import { FridaLogo } from "@/components/ui/FridaLogo";
 
 interface LoginPageProps {
   connected: boolean;
@@ -32,7 +33,7 @@ export function LoginPage({ connected, connectionFailed, reconnecting, onRetry, 
     <div className="flex h-screen items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-6 rounded-2xl border border-border bg-card p-10 shadow-lg">
         <div className="flex items-center gap-3">
-          <Zap className="h-10 w-10 text-primary" />
+          <FridaLogo className="h-10 w-10 text-primary" />
           <div>
             <h1 className="text-2xl font-bold">RE:Frida</h1>
             <p className="text-sm text-muted-foreground">Android Reverse Engineering</p>

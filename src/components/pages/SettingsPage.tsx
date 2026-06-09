@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-  Moon, Sun, Monitor, Wifi, Package, Save,
+  Moon, Sun, Monitor, Wifi, Package, Save, Palette,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,13 +9,11 @@ import { getConfig, saveConfig } from "@/hooks/tauri";
 import type { AppConfig } from "@/types";
 
 function applyTheme(theme: string) {
-  if (theme === "light") {
-    document.documentElement.setAttribute("data-theme", "light");
-  } else if (theme === "system") {
+  if (theme === "system") {
     const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
   } else {
-    document.documentElement.removeAttribute("data-theme");
+    document.documentElement.setAttribute("data-theme", theme);
   }
 }
 
@@ -41,10 +39,24 @@ export function SettingsPage() {
     }
   };
 
-  const themes = [
-    { id: "dark", label: "Dark", icon: Moon },
-    { id: "light", label: "Light", icon: Sun },
-    { id: "system", label: "System", icon: Monitor },
+  const themeGroups = [
+    {
+      label: "Standard",
+      themes: [
+        { id: "dark", label: "Dark", icon: Moon },
+        { id: "light", label: "Light", icon: Sun },
+        { id: "system", label: "System", icon: Monitor },
+      ],
+    },
+    {
+      label: "Community",
+      themes: [
+        { id: "catppuccin", label: "Catppuccin", icon: Palette },
+        { id: "tokyo-night", label: "Tokyo Night", icon: Palette },
+        { id: "rose-pine", label: "Rose Pine", icon: Palette },
+        { id: "kawaii", label: "Kawaii", icon: Palette },
+      ],
+    },
   ];
 
   return (
@@ -87,38 +99,45 @@ export function SettingsPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <Card>
+        <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Monitor className="h-4 w-4" />
+              <Palette className="h-4 w-4" />
               Appearance
             </CardTitle>
             <CardDescription>Choose your preferred theme</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="flex gap-2">
-              {themes.map((theme) => {
-                const Icon = theme.icon;
-                return (
-                  <button
-                    key={theme.id}
-                    onClick={() => {
-                      setConfig({ ...config, settings: { ...config.settings, theme: theme.id } });
-                      applyTheme(theme.id);
-                    }}
-                    className={
-                      "flex flex-1 flex-col items-center gap-2 rounded-lg border p-4 text-sm transition-colors " +
-                      (config.settings.theme === theme.id
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:bg-accent")
-                    }
-                  >
-                    <Icon className="h-5 w-5" />
-                    {theme.label}
-                  </button>
-                );
-              })}
-            </div>
+          <CardContent className="space-y-6">
+            {themeGroups.map((group) => (
+              <div key={group.label}>
+                <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  {group.label}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {group.themes.map((theme) => {
+                    const Icon = theme.icon;
+                    return (
+                      <button
+                        key={theme.id}
+                        onClick={() => {
+                          setConfig({ ...config, settings: { ...config.settings, theme: theme.id } });
+                          applyTheme(theme.id);
+                        }}
+                        className={
+                          "flex flex-col items-center gap-2 rounded-lg border p-3 text-sm transition-colors min-w-[90px] " +
+                          (config.settings.theme === theme.id
+                            ? "border-primary bg-primary/10"
+                            : "border-border hover:bg-accent")
+                        }
+                      >
+                        <Icon className="h-5 w-5" />
+                        <span className="text-xs">{theme.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </CardContent>
         </Card>
 

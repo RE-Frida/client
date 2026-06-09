@@ -11,13 +11,11 @@ import { getAuthState, isConnected, getConfig, reconnect } from "@/hooks/tauri";
 import type { TabId, AuthState } from "@/types";
 
 function applyTheme(theme: string) {
-  if (theme === "light") {
-    document.documentElement.setAttribute("data-theme", "light");
-  } else if (theme === "system") {
+  if (theme === "system") {
     const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
   } else {
-    document.documentElement.removeAttribute("data-theme");
+    document.documentElement.setAttribute("data-theme", theme);
   }
 }
 
@@ -97,10 +95,7 @@ export default function App() {
         />
         <main className="flex-1 overflow-auto">
           <div className={"h-full" + (activeTab === "dashboard" ? "" : " hidden")}>
-            <Dashboard
-              selectedDevice={selectedDevice}
-              onDeviceChange={setSelectedDevice}
-            />
+            <Dashboard />
           </div>
           <div className={"h-full" + (activeTab === "injection" ? "" : " hidden")}>
             <InjectionPage

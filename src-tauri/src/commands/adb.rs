@@ -105,6 +105,8 @@ pub async fn execute_script(
         .arg("Gadget")
         .arg("-l")
         .arg(script_str)
+        .arg("-q")
+        .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
