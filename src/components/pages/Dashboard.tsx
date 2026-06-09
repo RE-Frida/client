@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  Smartphone, RefreshCw, ChevronDown, User, Cpu, Wifi, Zap,
+  Smartphone, RefreshCw, ChevronDown, User, Wifi,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

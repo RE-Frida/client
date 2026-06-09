@@ -16,6 +16,9 @@ src-tauri/tools/*.exe
 src-tauri/tools/adb-*
 src-tauri/tools/frida-inject-*
 src-tauri/gen
+src-tauri/embedded_cert.pem
+src-tauri/embedded_key.pem
+src-tauri/spki_pin.txt
 target
 
 # Editor directories and files

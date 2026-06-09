@@ -4,12 +4,10 @@ import {
   FileCode2, Loader2, Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   getConfig, discoverDevices, startSession, executeScript,
-  launchApp, killApp, selectFolder, readFileContent,
+  launchApp, killApp,
 } from "@/hooks/tauri";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readTextFile } from "@tauri-apps/plugin-fs";

@@ -25,7 +25,7 @@ function hasValidIcon(project: ProjectData): boolean {
   return !!project.icon && project.icon.startsWith("data:");
 }
 
-export function Marketplace({ onUseProject }: MarketplaceProps) {
+export function Marketplace() {
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
