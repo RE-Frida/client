@@ -41,5 +41,14 @@ pub fn find_binary(name: &str) -> String {
     if cwd.exists() {
         return cwd.to_string_lossy().to_string();
     }
+    // Try resolving via shell (handles pip --user installs, etc.)
+    if let Ok(out) = std::process::Command::new("which").arg(name).output() {
+        if out.status.success() {
+            let path = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if !path.is_empty() {
+                return path;
+            }
+        }
+    }
     name_plain
 }

@@ -33,9 +33,6 @@ export function TitleBar() {
         </span>
       </div>
       <div className="flex items-center gap-2">
-        {version && (
-          <span className="text-[10px] text-muted-foreground">v{version}</span>
-        )}
         <button
           onClick={() => appWindow.minimize()}
           className="flex h-8 w-8 items-center justify-center text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"

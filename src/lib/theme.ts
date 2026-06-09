@@ -1,3 +1,5 @@
+import { convertFileSrc } from "@tauri-apps/api/core";
+
 export const ACCENT_PRESETS = [
   { name: "Blue", value: "#6366f1" },
   { name: "Purple", value: "#a855f7" },
@@ -41,7 +43,10 @@ export function applyTheme(theme: string, accentColor?: string, bgImage?: string
   }
 
   if (bgImage) {
-    root.style.setProperty("--bg-image", `url("${bgImage}")`);
+    const url = bgImage.startsWith("file://") || bgImage.startsWith("http://") || bgImage.startsWith("https://") || bgImage.startsWith("asset://")
+      ? bgImage
+      : convertFileSrc(bgImage);
+    root.style.setProperty("--bg-image", `url("${url}")`);
   } else {
     root.style.removeProperty("--bg-image");
   }

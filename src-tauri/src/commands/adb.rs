@@ -103,7 +103,7 @@ pub async fn execute_script(
         .arg(&device_id)
         .arg("-n")
         .arg("Gadget")
-        .arg("-s")
+        .arg("-l")
         .arg(script_str)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
