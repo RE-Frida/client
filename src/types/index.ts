@@ -9,6 +9,9 @@ export interface AppConfig {
   frida_port: number;
   custom_package: string;
   advanced_mode: boolean;
+  auth_token?: string;
+  auth_username?: string;
+  auth_avatar_url?: string;
 }
 
 export interface ScriptData {
@@ -35,4 +38,4 @@ export interface AuthState {
   token: string | null;
 }
 
-export type TabId = "dashboard" | "marketplace" | "editor" | "logs" | "settings";
+export type TabId = "dashboard" | "marketplace" | "logs" | "settings";

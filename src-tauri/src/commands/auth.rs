@@ -61,9 +61,19 @@ pub async fn start_login(state: State<'_, AppState>) -> Result<String, String> {
     auth.authenticated = true;
     auth.token = auth_result.token.clone();
     auth.username = auth_result.user.as_ref().map(|u| u.username.clone());
-    auth.avatar_url = auth_result.user.as_ref().and_then(|u| u.avatar.as_ref().map(|a| {
-        format!("https://cdn.discordapp.com/avatars/{}/{}.png", u.id, a)
-    }));
+    auth.avatar_url = auth_result.user.as_ref().and_then(|u| {
+        u.avatar.as_ref().map(|a| {
+            let ext = if a.starts_with("a_") { "gif" } else { "png" };
+            format!("https://cdn.discordapp.com/avatars/{}/{}.{}", u.id, a, ext)
+        })
+    });
+
+    // Save auth to config
+    let mut config = state.config.lock().unwrap();
+    config.auth_token = auth.token.clone();
+    config.auth_username = auth.username.clone();
+    config.auth_avatar_url = auth.avatar_url.clone();
+    crate::config::save_config_to_disk(&config);
 
     state.add_log(format!("Logged in as {}", auth.username.as_deref().unwrap_or("unknown")));
     Ok("Login successful".to_string())
@@ -82,6 +92,14 @@ pub async fn logout(state: State<'_, AppState>) -> Result<(), String> {
     auth.username = None;
     auth.avatar_url = None;
     auth.token = None;
+
+    // Clear auth from config
+    let mut config = state.config.lock().unwrap();
+    config.auth_token = None;
+    config.auth_username = None;
+    config.auth_avatar_url = None;
+    crate::config::save_config_to_disk(&config);
+
     state.add_log("Logged out".to_string());
     Ok(())
 }

@@ -105,15 +105,18 @@ impl AppState {
         dbg_log!("ADB path: {}", adb_path);
         dbg_log!("Frida path: {}", frida_path);
 
+        // Load saved auth from config
+        let auth = AuthState {
+            authenticated: config.auth_token.is_some(),
+            username: config.auth_username.clone(),
+            avatar_url: config.auth_avatar_url.clone(),
+            token: config.auth_token.clone(),
+        };
+
         Self {
             config: Arc::new(Mutex::new(config)),
             log_buffer: Arc::new(Mutex::new(Vec::new())),
-            auth: Arc::new(Mutex::new(AuthState {
-                authenticated: false,
-                username: None,
-                avatar_url: None,
-                token: None,
-            })),
+            auth: Arc::new(Mutex::new(auth)),
             adb_path,
             frida_path,
             ws: Arc::new(RwLock::new(None)),

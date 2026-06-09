@@ -8,6 +8,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getConfig, saveConfig } from "@/hooks/tauri";
 import type { AppConfig } from "@/types";
 
+function applyTheme(theme: string) {
+  if (theme === "light") {
+    document.documentElement.setAttribute("data-theme", "light");
+  } else if (theme === "system") {
+    const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
+  } else {
+    document.documentElement.removeAttribute("data-theme");
+  }
+}
+
 export function SettingsPage() {
   const [config, setConfig] = useState<AppConfig>({
     theme: "dark",
@@ -91,7 +102,10 @@ export function SettingsPage() {
                 return (
                   <button
                     key={theme.id}
-                    onClick={() => setConfig({ ...config, theme: theme.id })}
+                    onClick={() => {
+                      setConfig({ ...config, theme: theme.id });
+                      applyTheme(theme.id);
+                    }}
                     className={
                       "flex flex-1 flex-col items-center gap-2 rounded-lg border p-4 text-sm transition-colors " +
                       (config.theme === theme.id

@@ -13,6 +13,12 @@ pub struct AppConfig {
     pub frida_port: u16,
     pub custom_package: String,
     pub advanced_mode: bool,
+    #[serde(default)]
+    pub auth_token: Option<String>,
+    #[serde(default)]
+    pub auth_username: Option<String>,
+    #[serde(default)]
+    pub auth_avatar_url: Option<String>,
 }
 
 impl Default for AppConfig {
@@ -22,6 +28,9 @@ impl Default for AppConfig {
             frida_port: 27042,
             custom_package: "com.target.app".to_string(),
             advanced_mode: false,
+            auth_token: None,
+            auth_username: None,
+            auth_avatar_url: None,
         }
     }
 }

@@ -4,11 +4,21 @@ import { TitleBar } from "@/components/layout/TitleBar";
 import { Dashboard } from "@/components/pages/Dashboard";
 import { LogsPage } from "@/components/pages/LogsPage";
 import { Marketplace } from "@/components/pages/MarketplacePage";
-import { EditorPage } from "@/components/pages/EditorPage";
 import { SettingsPage } from "@/components/pages/SettingsPage";
 import { LoginPage } from "@/components/pages/LoginPage";
-import { getAuthState, isConnected, discoverDevices } from "@/hooks/tauri";
-import type { TabId, AuthState, DeviceInfo } from "@/types";
+import { getAuthState, isConnected, getConfig, discoverDevices } from "@/hooks/tauri";
+import type { TabId, AuthState, DeviceInfo, AppConfig } from "@/types";
+
+function applyTheme(theme: string) {
+  if (theme === "light") {
+    document.documentElement.setAttribute("data-theme", "light");
+  } else if (theme === "system") {
+    const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
+  } else {
+    document.documentElement.removeAttribute("data-theme");
+  }
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>("dashboard");
@@ -36,6 +46,8 @@ export default function App() {
 
   useEffect(() => {
     pollAuth();
+    // Apply saved theme
+    getConfig().then((config) => applyTheme(config.theme)).catch(() => {});
     const authPoll = setInterval(pollAuth, 2000);
     return () => clearInterval(authPoll);
   }, [pollAuth]);
@@ -65,17 +77,15 @@ export default function App() {
   const renderContent = () => {
     switch (activeTab) {
       case "dashboard":
-        return <Dashboard selectedDevice={selectedDevice} />;
+        return <Dashboard selectedDevice={selectedDevice} onDeviceChange={setSelectedDevice} />;
       case "logs":
         return <LogsPage />;
       case "marketplace":
         return <Marketplace onUseScript={(_code) => setActiveTab("dashboard")} />;
-      case "editor":
-        return <EditorPage onLog={() => {}} />;
       case "settings":
         return <SettingsPage />;
       default:
-        return <Dashboard selectedDevice={selectedDevice} />;
+        return <Dashboard selectedDevice={selectedDevice} onDeviceChange={setSelectedDevice} />;
     }
   };
 
@@ -87,9 +97,6 @@ export default function App() {
           activeTab={activeTab}
           onTabChange={setActiveTab}
           auth={auth}
-          devices={devices}
-          selectedDevice={selectedDevice}
-          onDeviceChange={setSelectedDevice}
           onLogout={() => {
             setAuth({ authenticated: false, username: null, avatar_url: null, token: null });
           }}

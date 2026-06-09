@@ -66,10 +66,6 @@ export function Marketplace({ onUseScript }: MarketplaceProps) {
           <h2 className="text-2xl font-bold">Marketplace</h2>
           <p className="text-sm text-muted-foreground">Browse and use community scripts</p>
         </div>
-        <Button variant="outline" size="sm">
-          <ExternalLink className="mr-2 h-4 w-4" />
-          Open Console
-        </Button>
       </div>
 
       <div className="relative">
