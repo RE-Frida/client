@@ -59,32 +59,28 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "flex h-full flex-col border-r border-sidebar-border bg-sidebar transition-all duration-200",
+        "group relative flex h-full flex-col border-r border-sidebar-border bg-sidebar transition-all duration-200",
         collapsed ? "w-14" : "w-48"
       )}
     >
-      {/* Toggle */}
-      <div
+      {/* Collapse Toggle */}
+      <button
+        onClick={toggle}
         className={cn(
-          "flex py-2",
-          collapsed ? "justify-center" : "justify-end px-2"
+          "absolute top-1 z-10 rounded-md p-1 text-sidebar-foreground/40 hover:text-sidebar-foreground",
+          collapsed ? "inset-x-0 mx-auto w-fit" : "right-1"
         )}
+        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       >
-        <button
-          onClick={toggle}
-          className="rounded-md p-1 text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {collapsed ? (
-            <PanelLeftOpen className="h-4 w-4" />
-          ) : (
-            <PanelLeftClose className="h-4 w-4" />
-          )}
-        </button>
-      </div>
+        {collapsed ? (
+          <PanelLeftOpen className="h-4 w-4" />
+        ) : (
+          <PanelLeftClose className="h-4 w-4" />
+        )}
+      </button>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-0.5 px-1.5">
+      <nav className="flex-1 space-y-0.5 px-1.5 pt-8">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;

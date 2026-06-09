@@ -56,7 +56,7 @@ export function SettingsPage() {
   ];
 
   return (
-    <div className="flex h-full flex-col gap-6 p-4">
+    <div className="flex h-full flex-col gap-6 overflow-y-auto p-4 pb-8">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Settings</h2>

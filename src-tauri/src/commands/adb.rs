@@ -97,22 +97,24 @@ pub async fn execute_script(
     let script_str = script_path.to_str().unwrap_or("");
     state.add_log(format!("Executing script on {} via USB", device_id));
 
-    let mut child = tokio::process::Command::new(&state.frida_inject_path)
+    let mut child = tokio::process::Command::new(&state.frida_path)
+        .arg("-q")
         .arg("-D")
         .arg(&device_id)
         .arg("-n")
         .arg("Gadget")
         .arg("-s")
         .arg(script_str)
+        .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| {
             let _ = std::fs::remove_file(&script_path);
             if e.to_string().contains("No such file") || e.to_string().contains("not found") {
-                "Frida not found.\n\nInstall: pip install frida-tools".to_string()
+                "Frida not found.\n\nInstall: pip install frida".to_string()
             } else {
-                format!("frida-inject failed: {}", e)
+                format!("frida failed: {}", e)
             }
         })?;
 
