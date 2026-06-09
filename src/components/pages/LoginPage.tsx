@@ -1,14 +1,17 @@
 import { useState } from "react";
-import { Zap, Loader2, LogIn, AlertCircle } from "lucide-react";
+import { Zap, Loader2, LogIn, AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { startLogin } from "@/hooks/tauri";
 
 interface LoginPageProps {
   connected: boolean;
+  connectionFailed: boolean;
+  reconnecting: boolean;
+  onRetry: () => void;
   onLoginSuccess: () => void;
 }
 
-export function LoginPage({ connected, onLoginSuccess }: LoginPageProps) {
+export function LoginPage({ connected, connectionFailed, reconnecting, onRetry, onLoginSuccess }: LoginPageProps) {
   const [loggingIn, setLoggingIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,10 +39,32 @@ export function LoginPage({ connected, onLoginSuccess }: LoginPageProps) {
           </div>
         </div>
 
-        {!connected ? (
+        {!connected && !connectionFailed ? (
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             <p className="text-sm text-muted-foreground">Connecting to server...</p>
+          </div>
+        ) : !connected && connectionFailed ? (
+          <div className="flex flex-col items-center gap-4">
+            <AlertCircle className="h-8 w-8 text-destructive" />
+            <div className="text-center">
+              <p className="text-sm font-medium text-destructive">Failed to connect to server</p>
+              <p className="text-xs text-muted-foreground mt-1">Make sure the server is running and accessible</p>
+            </div>
+            <Button onClick={onRetry} disabled={reconnecting} size="lg" className="gap-2">
+              {reconnecting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {reconnecting ? "Reconnecting..." : "Retry Connection"}
+            </Button>
+            {error && (
+              <div className="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                {error}
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-center gap-4">

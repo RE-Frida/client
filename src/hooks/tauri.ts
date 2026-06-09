@@ -112,6 +112,10 @@ export async function isConnected(): Promise<boolean> {
   return invoke("is_connected");
 }
 
+export async function reconnect(): Promise<void> {
+  return invoke("reconnect");
+}
+
 // ─── App ─────────────────────────────────────────────────────────
 
 export async function getAppVersion(): Promise<string> {

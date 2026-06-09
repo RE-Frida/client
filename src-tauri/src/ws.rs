@@ -40,6 +40,7 @@ pub async fn connect_ws(state: AppState) {
     // Spawn writer task
     tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
+            dbg_log!("WS SEND: {}", msg);
             if ws_sink
                 .send(tokio_tungstenite::tungstenite::Message::Text(msg.into()))
                 .await
@@ -59,6 +60,7 @@ pub async fn connect_ws(state: AppState) {
             match msg {
                 Ok(tokio_tungstenite::tungstenite::Message::Text(text)) => {
                     let text: String = text.into();
+                    dbg_log!("WS RECV: {}", text);
                     match serde_json::from_str::<WsMessage>(&text) {
                         Ok(WsMessage::Response(resp)) => {
                             if let Some(sender) = pending_clone.lock().unwrap().remove(&resp.id) {
@@ -66,24 +68,52 @@ pub async fn connect_ws(state: AppState) {
                             }
                         }
                         Ok(WsMessage::Pong) => {}
-                        Ok(WsMessage::Event(ServerEvent::ServerMessage {
-                            message,
-                            level,
-                        })) => {
-                            let mut logs = log_clone.lock().unwrap();
-                            logs.push(format!(
-                                "[{}] [{}] {}",
-                                chrono::Local::now().format("%H:%M:%S"),
-                                level,
-                                message
-                            ));
+                        Ok(WsMessage::Event(event)) => {
+                            match event {
+                                ServerEvent::ServerMessage {
+                                    message,
+                                    level,
+                                } => {
+                                    let mut logs = log_clone.lock().unwrap();
+                                    logs.push(format!(
+                                        "[{}] [{}] {}",
+                                        chrono::Local::now().format("%H:%M:%S"),
+                                        level,
+                                        message
+                                    ));
+                                }
+                                _ => {
+                                    dbg_log!("WS EVENT: {:?}", event);
+                                }
+                            }
                         }
-                        _ => {}
+                        Ok(WsMessage::Ping) => {
+                            dbg_log!("WS PING received");
+                        }
+                        Ok(WsMessage::Auth(_)) => {}
+                        Ok(WsMessage::Request(_)) => {}
+                        _ => {
+                            dbg_log!("WS UNKNOWN message type");
+                        }
                     }
                 }
-                Ok(tokio_tungstenite::tungstenite::Message::Close(_)) => break,
-                Err(_) => break,
-                _ => {}
+                Ok(tokio_tungstenite::tungstenite::Message::Ping(_data)) => {
+                    dbg_log!("WS PING frame");
+                }
+                Ok(tokio_tungstenite::tungstenite::Message::Pong(_)) => {
+                    dbg_log!("WS PONG frame");
+                }
+                Ok(tokio_tungstenite::tungstenite::Message::Close(_)) => {
+                    dbg_log!("WS CLOSE received");
+                    break;
+                }
+                Err(_e) => {
+                    dbg_log!("WS ERROR: {}", _e);
+                    break;
+                }
+                _ => {
+                    dbg_log!("WS unknown frame type");
+                }
             }
         }
         *connected_clone.lock().unwrap() = false;

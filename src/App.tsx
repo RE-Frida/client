@@ -7,7 +7,7 @@ import { LogsPage } from "@/components/pages/LogsPage";
 import { Marketplace } from "@/components/pages/MarketplacePage";
 import { SettingsPage } from "@/components/pages/SettingsPage";
 import { LoginPage } from "@/components/pages/LoginPage";
-import { getAuthState, isConnected, getConfig } from "@/hooks/tauri";
+import { getAuthState, isConnected, getConfig, reconnect } from "@/hooks/tauri";
 import type { TabId, AuthState } from "@/types";
 
 function applyTheme(theme: string) {
@@ -25,6 +25,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>("dashboard");
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [connected, setConnected] = useState(false);
+  const [connectionFailed, setConnectionFailed] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
 
   const pollAuth = useCallback(() => {
@@ -36,8 +38,33 @@ export default function App() {
     pollAuth();
     getConfig().then((config) => applyTheme(config.theme)).catch(() => {});
     const authPoll = setInterval(pollAuth, 2000);
-    return () => clearInterval(authPoll);
+    // After 10 seconds of no connection, show failed screen
+    const failTimer = setTimeout(() => {
+      setConnectionFailed(true);
+    }, 10000);
+    return () => {
+      clearInterval(authPoll);
+      clearTimeout(failTimer);
+    };
   }, [pollAuth]);
+
+  useEffect(() => {
+    if (connected) {
+      setConnectionFailed(false);
+    }
+  }, [connected]);
+
+  const handleRetry = async () => {
+    setReconnecting(true);
+    setConnectionFailed(false);
+    try {
+      await reconnect();
+    } catch (e) {
+      console.error("Reconnect failed:", e);
+    } finally {
+      setReconnecting(false);
+    }
+  };
 
   if (!connected || !auth?.authenticated) {
     return (
@@ -45,6 +72,9 @@ export default function App() {
         <TitleBar />
         <LoginPage
           connected={connected}
+          connectionFailed={connectionFailed}
+          reconnecting={reconnecting}
+          onRetry={handleRetry}
           onLoginSuccess={() => {
             getAuthState().then(setAuth).catch(() => {});
           }}
