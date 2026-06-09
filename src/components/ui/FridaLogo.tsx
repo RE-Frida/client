@@ -10,7 +10,7 @@ export function FridaLogo({ className, size = 24 }: FridaLogoProps) {
       width={size}
       height={size}
       viewBox="0 0 100 100"
-      fill="currentColor"
+      fill="#EF6456"
       xmlns="http://www.w3.org/2000/svg"
     >
       <g transform="translate(19, 26)">
