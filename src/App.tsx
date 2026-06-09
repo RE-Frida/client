@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TitleBar } from "@/components/layout/TitleBar";
 import { Dashboard } from "@/components/pages/Dashboard";
-import { EditorPage } from "@/components/pages/EditorPage";
+import { InjectionPage } from "@/components/pages/InjectionPage";
 import { LogsPage } from "@/components/pages/LogsPage";
 import { Marketplace } from "@/components/pages/MarketplacePage";
 import { SettingsPage } from "@/components/pages/SettingsPage";
@@ -26,7 +26,6 @@ export default function App() {
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [connected, setConnected] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
-  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
 
   const pollAuth = useCallback(() => {
     getAuthState().then(setAuth).catch(() => {});
@@ -71,27 +70,19 @@ export default function App() {
             <Dashboard
               selectedDevice={selectedDevice}
               onDeviceChange={setSelectedDevice}
-              onNavigateToEditor={() => setActiveTab("editor")}
             />
           </div>
-          <div className={"h-full" + (activeTab === "editor" ? "" : " hidden")}>
-            <EditorPage
+          <div className={"h-full" + (activeTab === "injection" ? "" : " hidden")}>
+            <InjectionPage
               selectedDevice={selectedDevice}
               onDeviceChange={setSelectedDevice}
-              projectId={currentProjectId}
-              onProjectChange={setCurrentProjectId}
             />
           </div>
           <div className={"h-full" + (activeTab === "logs" ? "" : " hidden")}>
             <LogsPage />
           </div>
           <div className={"h-full" + (activeTab === "marketplace" ? "" : " hidden")}>
-            <Marketplace
-              onUseProject={(projectId) => {
-                setCurrentProjectId(projectId);
-                setActiveTab("editor");
-              }}
-            />
+            <Marketplace />
           </div>
           <div className={"h-full" + (activeTab === "settings" ? "" : " hidden")}>
             <SettingsPage />

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   LayoutDashboard,
   Store,
-  Code2,
+  Send,
   ScrollText,
   Settings,
   Zap,
@@ -22,7 +22,7 @@ interface SidebarProps {
 
 const navItems: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "editor", label: "Editor", icon: Code2 },
+  { id: "injection", label: "Injection", icon: Send },
   { id: "marketplace", label: "Marketplace", icon: Store },
   { id: "logs", label: "Logs", icon: ScrollText },
   { id: "settings", label: "Settings", icon: Settings },

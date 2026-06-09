@@ -10,10 +10,9 @@ import type { DeviceInfo, AuthState, AppConfig } from "@/types";
 interface DashboardProps {
   selectedDevice: string | null;
   onDeviceChange: (id: string | null) => void;
-  onNavigateToEditor: () => void;
 }
 
-export function Dashboard({ selectedDevice, onDeviceChange, onNavigateToEditor }: DashboardProps) {
+export function Dashboard({ selectedDevice, onDeviceChange }: DashboardProps) {
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -165,23 +164,7 @@ export function Dashboard({ selectedDevice, onDeviceChange, onNavigateToEditor }
         </Card>
       </div>
 
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Zap className="h-4 w-4" />
-            Quick Actions
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-3">
-            <Button onClick={onNavigateToEditor}>
-              <Cpu className="mr-2 h-4 w-4" />
-              Open Editor
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+
     </div>
   );
 }

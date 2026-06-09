@@ -19,10 +19,6 @@ import {
 } from "@/hooks/tauri";
 import type { ProjectData, AuthState } from "@/types";
 
-interface MarketplaceProps {
-  onUseProject: (projectId: string) => void;
-}
-
 const CATEGORIES = ["All", "Tools", "Games", "Security", "Utilities", "Other"];
 
 function hasValidIcon(project: ProjectData): boolean {
@@ -180,10 +176,6 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
     }
   };
 
-  const handleUse = (project: ProjectData) => {
-    onUseProject(project.id);
-  };
-
   const handleDeleteClick = (project: ProjectData) => {
     setDeleteTarget(project);
     setShowDeleteConfirm(true);
@@ -304,17 +296,14 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
             )}
             Update
           </Button>
-          <Button size="sm" variant="outline" onClick={click(handleUse)}>
-            Use
-          </Button>
         </div>
       );
     }
 
     return (
-      <Button size="sm" onClick={click(handleUse)}>
-        <CheckCircle2 className="mr-1 h-3 w-3" />
-        Use
+      <Button size="sm" variant="outline" onClick={click(handleDownload)}>
+        <Download className="mr-1 h-3 w-3" />
+        Redownload
       </Button>
     );
   };
