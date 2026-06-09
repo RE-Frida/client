@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Minus, Square, X } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getVersion } from "@tauri-apps/api/app";
 import { FridaLogo } from "@/components/ui/FridaLogo";
 
 export function TitleBar() {
@@ -12,18 +13,15 @@ export function TitleBar() {
     if (cached) {
       setVersion(cached);
     }
-    fetch("https://api.github.com/repos/RE-Frida/client/releases/latest", {
-      headers: { Accept: "application/vnd.github.v3+json" },
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data?.tag_name) {
-          const v = data.tag_name.replace(/^v/, "");
-          setVersion(v);
-          localStorage.setItem("refrida_version", v);
-        }
-      })
-      .catch(() => {});
+    (async () => {
+      try {
+        const v = await getVersion();
+        setVersion(v);
+        localStorage.setItem("refrida_version", v);
+      } catch {
+        // ignore
+      }
+    })();
   }, []);
 
   return (

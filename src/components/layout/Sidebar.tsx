@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { logout } from "@/hooks/tauri";
-import { FridaLogo } from "@/components/ui/FridaLogo";
 import type { TabId, AuthState } from "@/types";
 
 interface SidebarProps {
@@ -45,11 +44,6 @@ export function Sidebar({
 
   return (
     <aside className="flex h-full w-48 flex-col border-r border-sidebar-border bg-sidebar">
-      {/* Logo */}
-      <div className="flex items-center justify-center border-b border-sidebar-border py-3">
-        <FridaLogo className="h-6 w-6 text-primary" />
-      </div>
-
       {/* Navigation */}
       <nav className="flex-1 space-y-0.5 px-2 py-2">
         {navItems.map((item) => {
