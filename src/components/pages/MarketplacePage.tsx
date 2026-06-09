@@ -192,6 +192,8 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
 
   const handleCreate = async () => {
     if (!createName.trim()) return;
+    if (createName.length > 32) return;
+    if (createDescription.length > 128) return;
     const tags = createTags
       .split(",")
       .map((t) => t.trim())
@@ -571,19 +573,29 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Name</label>
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <span>Name</span>
+                  <span className="text-[10px] text-muted-foreground">{createName.length}/32</span>
+                </label>
                 <Input
                   placeholder="My Project"
                   value={createName}
-                  onChange={(e) => setCreateName(e.target.value)}
+                  onChange={(e) => {
+                    if (e.target.value.length <= 32) setCreateName(e.target.value);
+                  }}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Description</label>
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <span>Description</span>
+                  <span className="text-[10px] text-muted-foreground">{createDescription.length}/128</span>
+                </label>
                 <Input
                   placeholder="A short description of your project"
                   value={createDescription}
-                  onChange={(e) => setCreateDescription(e.target.value)}
+                  onChange={(e) => {
+                    if (e.target.value.length <= 128) setCreateDescription(e.target.value);
+                  }}
                 />
               </div>
               <div className="space-y-2">
