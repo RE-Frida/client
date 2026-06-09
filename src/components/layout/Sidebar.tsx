@@ -7,6 +7,7 @@ import {
   Settings,
   Zap,
   LogOut,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { logout, getAppVersion } from "@/hooks/tauri";
@@ -87,13 +88,22 @@ export function Sidebar({
       {/* Auth Section */}
       <div className="border-t border-sidebar-border px-3 py-2">
         <div className="flex items-center gap-2">
-          {auth.avatar_url && (
-            <img
-              src={auth.avatar_url}
-              alt="avatar"
-              className="h-6 w-6 rounded-full"
-            />
-          )}
+          <div className="relative h-6 w-6 shrink-0">
+            {auth.avatar_url ? (
+              <img
+                src={auth.avatar_url}
+                alt="avatar"
+                className="h-full w-full rounded-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).classList.add("hidden");
+                  (e.target as HTMLImageElement).parentElement!.querySelector(".fallback")?.classList.remove("hidden");
+                }}
+              />
+            ) : null}
+            <div className={"fallback flex h-full w-full items-center justify-center rounded-full bg-muted" + (auth.avatar_url ? " hidden" : "")}>
+              <User className="h-3 w-3 text-muted-foreground" />
+            </div>
+          </div>
           <span className="flex-1 truncate text-xs font-medium text-sidebar-foreground">
             {auth.username}
           </span>

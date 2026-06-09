@@ -54,49 +54,6 @@ export default function App() {
     );
   }
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case "dashboard":
-        return (
-          <Dashboard
-            selectedDevice={selectedDevice}
-            onDeviceChange={setSelectedDevice}
-            onNavigateToEditor={() => setActiveTab("editor")}
-          />
-        );
-      case "editor":
-        return (
-          <EditorPage
-            selectedDevice={selectedDevice}
-            onDeviceChange={setSelectedDevice}
-            projectId={currentProjectId}
-            onProjectChange={setCurrentProjectId}
-          />
-        );
-      case "logs":
-        return <LogsPage />;
-      case "marketplace":
-        return (
-          <Marketplace
-            onUseProject={(projectId) => {
-              setCurrentProjectId(projectId);
-              setActiveTab("editor");
-            }}
-          />
-        );
-      case "settings":
-        return <SettingsPage />;
-      default:
-        return (
-          <Dashboard
-            selectedDevice={selectedDevice}
-            onDeviceChange={setSelectedDevice}
-            onNavigateToEditor={() => setActiveTab("editor")}
-          />
-        );
-    }
-  };
-
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
       <TitleBar />
@@ -110,7 +67,35 @@ export default function App() {
           }}
         />
         <main className="flex-1 overflow-auto">
-          {renderContent()}
+          <div className={"h-full" + (activeTab === "dashboard" ? "" : " hidden")}>
+            <Dashboard
+              selectedDevice={selectedDevice}
+              onDeviceChange={setSelectedDevice}
+              onNavigateToEditor={() => setActiveTab("editor")}
+            />
+          </div>
+          <div className={"h-full" + (activeTab === "editor" ? "" : " hidden")}>
+            <EditorPage
+              selectedDevice={selectedDevice}
+              onDeviceChange={setSelectedDevice}
+              projectId={currentProjectId}
+              onProjectChange={setCurrentProjectId}
+            />
+          </div>
+          <div className={"h-full" + (activeTab === "logs" ? "" : " hidden")}>
+            <LogsPage />
+          </div>
+          <div className={"h-full" + (activeTab === "marketplace" ? "" : " hidden")}>
+            <Marketplace
+              onUseProject={(projectId) => {
+                setCurrentProjectId(projectId);
+                setActiveTab("editor");
+              }}
+            />
+          </div>
+          <div className={"h-full" + (activeTab === "settings" ? "" : " hidden")}>
+            <SettingsPage />
+          </div>
         </main>
       </div>
     </div>

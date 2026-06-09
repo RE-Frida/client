@@ -118,13 +118,22 @@ export function Dashboard({ selectedDevice, onDeviceChange, onNavigateToEditor }
           <CardContent className="space-y-3">
             {auth?.authenticated ? (
               <div className="flex items-center gap-3">
-                {auth.avatar_url && (
-                  <img
-                    src={auth.avatar_url}
-                    alt="avatar"
-                    className="h-10 w-10 rounded-full"
-                  />
-                )}
+                <div className="relative h-10 w-10 shrink-0">
+                  {auth.avatar_url ? (
+                    <img
+                      src={auth.avatar_url}
+                      alt="avatar"
+                      className="h-full w-full rounded-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).classList.add("hidden");
+                        (e.target as HTMLImageElement).parentElement!.querySelector(".fallback")?.classList.remove("hidden");
+                      }}
+                    />
+                  ) : null}
+                  <div className={"fallback flex h-full w-full items-center justify-center rounded-full bg-muted" + (auth.avatar_url ? " hidden" : "")}>
+                    <User className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                </div>
                 <div>
                   <div className="font-medium">{auth.username}</div>
                   <div className="text-xs text-muted-foreground">Discord</div>

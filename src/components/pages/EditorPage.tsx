@@ -146,24 +146,28 @@ export function EditorPage({ selectedDevice, onDeviceChange, projectId, onProjec
     const folder = await selectFolder();
     if (folder) {
       setWorkspacePath(folder);
-      // Clear project context when opening a local folder
       if (onProjectChange) onProjectChange(null);
       setProjectInfo(null);
       setIsOwner(false);
       setDiff(null);
-      await loadFiles(folder);
-      const wsConfig = await loadWorkspaceConfig(folder);
-      setWorkspaceConfig(wsConfig);
+      setCode("");
+      setSelectedFile(null);
+      setOutput("");
+      try {
+        await loadFiles(folder);
+        let wsConfig = await loadWorkspaceConfig(folder);
+        await saveWorkspaceConfig(folder, wsConfig);
+        setWorkspaceConfig(wsConfig);
+      } catch (e) {
+        console.error("Failed to open workspace:", e);
+        setOutput("Error opening workspace: " + e);
+      }
     }
   };
 
   const loadFiles = async (path: string) => {
-    try {
-      const fileList = await readWorkspaceFiles(path);
-      setFiles(fileList);
-    } catch (e) {
-      console.error("Failed to load files:", e);
-    }
+    const fileList = await readWorkspaceFiles(path);
+    setFiles(fileList);
   };
 
   const refreshFiles = async () => {

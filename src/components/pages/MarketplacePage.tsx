@@ -47,8 +47,8 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
   const [showInstalled, setShowInstalled] = useState(false);
   const [diffMap, setDiffMap] = useState<Map<string, boolean>>(new Map());
 
-  // Detail modal state
-  const [detailProject, setDetailProject] = useState<ProjectData | null>(null);
+  // Detail page state
+  const [viewProject, setViewProject] = useState<ProjectData | null>(null);
   const [detailFiles, setDetailFiles] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
@@ -105,7 +105,7 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
   });
 
   const openDetail = async (project: ProjectData) => {
-    setDetailProject(project);
+    setViewProject(project);
     setSelectedFile(null);
     setFileContent(null);
     setLoadingFiles(true);
@@ -132,19 +132,19 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
   };
 
   const closeDetail = () => {
-    setDetailProject(null);
+    setViewProject(null);
     setDetailFiles([]);
     setSelectedFile(null);
     setFileContent(null);
   };
 
   const handleSelectFile = async (path: string) => {
-    if (!detailProject) return;
+    if (!viewProject) return;
     setSelectedFile(path);
     setFileContent(null);
     setLoadingContent(true);
     try {
-      const content = await getProjectFile(detailProject.id, path);
+      const content = await getProjectFile(viewProject.id, path);
       setFileContent(content);
     } catch (e) {
       console.error("Failed to get file content:", e);
@@ -193,7 +193,7 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
     if (!deleteTarget) return;
     try {
       await deleteProject(deleteTarget.id);
-      if (detailProject?.id === deleteTarget.id) {
+      if (viewProject?.id === deleteTarget.id) {
         closeDetail();
       }
       await fetchProjects();
@@ -263,15 +263,19 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
     .map((t) => t.trim())
     .filter(Boolean).length;
 
-  const renderProjectActions = (project: ProjectData) => {
+  const renderProjectActions = (project: ProjectData, inCard: boolean = false) => {
     const isInstalled = installed.has(project.id);
     const needsUpdate = diffMap.get(project.id);
+    const click = (fn: (...args: any[]) => void) => (e: React.MouseEvent) => {
+      if (inCard) e.stopPropagation();
+      fn(project);
+    };
 
     if (!isInstalled) {
       return (
         <Button
           size="sm"
-          onClick={() => handleDownload(project)}
+          onClick={click(handleDownload)}
           disabled={downloading === project.id}
         >
           {downloading === project.id ? (
@@ -290,7 +294,7 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
           <Button
             size="sm"
             variant="secondary"
-            onClick={() => handleUpdate(project)}
+            onClick={click(handleUpdate)}
             disabled={updating === project.id}
           >
             {updating === project.id ? (
@@ -300,7 +304,7 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
             )}
             Update
           </Button>
-          <Button size="sm" variant="outline" onClick={() => handleUse(project)}>
+          <Button size="sm" variant="outline" onClick={click(handleUse)}>
             Use
           </Button>
         </div>
@@ -308,7 +312,7 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
     }
 
     return (
-      <Button size="sm" onClick={() => handleUse(project)}>
+      <Button size="sm" onClick={click(handleUse)}>
         <CheckCircle2 className="mr-1 h-3 w-3" />
         Use
       </Button>
@@ -372,6 +376,119 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
       )}
 
       <ScrollArea className="flex-1">
+        {viewProject ? (
+          <div className="space-y-4 pr-4">
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={closeDetail}>
+                <ArrowLeft className="mr-1.5 h-4 w-4" />
+                Back to Projects
+              </Button>
+              {isOwner(viewProject) && (
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => handleDeleteClick(viewProject)}
+                >
+                  <Trash2 className="mr-1.5 h-3 w-3" />
+                  Delete
+                </Button>
+              )}
+            </div>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex gap-6 mb-6">
+                  {hasValidIcon(viewProject) && (
+                    <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-muted overflow-hidden">
+                      <img
+                        src={viewProject.icon}
+                        alt={viewProject.name}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  )}
+                  <div className="flex flex-1 flex-col gap-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h2 className="text-xl font-bold">{viewProject.name}</h2>
+                        <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                          <User className="h-3 w-3" />
+                          {viewProject.author}
+                        </p>
+                      </div>
+                      <Badge variant="secondary">{viewProject.category}</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{viewProject.description}</p>
+                    {viewProject.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {viewProject.tags.map((tag) => (
+                          <Badge key={tag} variant="outline" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3 mt-1">
+                      {renderProjectActions(viewProject)}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-medium mb-2 flex items-center gap-1.5">
+                    <FileCode className="h-4 w-4" />
+                    Files
+                  </h3>
+                  {loadingFiles ? (
+                    <div className="flex items-center justify-center py-8 text-muted-foreground">
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    </div>
+                  ) : (
+                    <div className="flex gap-4">
+                      <div className="w-48 shrink-0 space-y-0.5">
+                        {detailFiles.map((file) => (
+                          <button
+                            key={file}
+                            className={
+                              "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-left transition-colors " +
+                              (selectedFile === file
+                                ? "bg-primary/10 text-primary"
+                                : "hover:bg-muted text-muted-foreground hover:text-foreground")
+                            }
+                            onClick={() => handleSelectFile(file)}
+                          >
+                            <FileCode className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{file}</span>
+                          </button>
+                        ))}
+                        {detailFiles.length === 0 && (
+                          <p className="py-2 text-center text-xs text-muted-foreground">
+                            No files
+                          </p>
+                        )}
+                      </div>
+                      {selectedFile && (
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-medium text-muted-foreground mb-1">
+                            {selectedFile}
+                          </div>
+                          {loadingContent ? (
+                            <div className="flex items-center justify-center py-4 text-muted-foreground">
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            </div>
+                          ) : (
+                            <pre className="max-h-96 overflow-auto rounded bg-muted p-3 text-xs font-mono whitespace-pre-wrap">
+                              {fileContent}
+                            </pre>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
         <div className="space-y-2 pr-4">
           {loading ? (
             <div className="flex items-center justify-center py-8 text-muted-foreground">
@@ -446,125 +563,8 @@ export function Marketplace({ onUseProject }: MarketplaceProps) {
             ))
           )}
         </div>
+        )}
       </ScrollArea>
-
-      {/* Project Detail Modal */}
-      {detailProject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <Card className="w-full max-w-3xl max-h-[90vh] flex flex-col mx-4">
-            <CardHeader className="shrink-0">
-              <div className="flex items-center justify-between">
-                <Button variant="ghost" size="sm" onClick={closeDetail}>
-                  <ArrowLeft className="mr-1.5 h-4 w-4" />
-                  Back
-                </Button>
-                {isOwner(detailProject) && (
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => handleDeleteClick(detailProject)}
-                  >
-                    <Trash2 className="mr-1.5 h-3 w-3" />
-                    Delete
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <ScrollArea className="flex-1 px-6 pb-6">
-              <div className="flex gap-6 mb-6">
-                {hasValidIcon(detailProject) && (
-                  <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-muted overflow-hidden">
-                    <img
-                      src={detailProject.icon}
-                      alt={detailProject.name}
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-                )}
-                <div className="flex flex-1 flex-col gap-2">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h2 className="text-xl font-bold">{detailProject.name}</h2>
-                      <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                        <User className="h-3 w-3" />
-                        {detailProject.author}
-                      </p>
-                    </div>
-                    <Badge variant="secondary">{detailProject.category}</Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{detailProject.description}</p>
-                  {detailProject.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {detailProject.tags.map((tag) => (
-                        <Badge key={tag} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-3 mt-1">
-                    {renderProjectActions(detailProject)}
-                  </div>
-                </div>
-              </div>
-
-              {/* Files */}
-              <div>
-                <h3 className="text-sm font-medium mb-2 flex items-center gap-1.5">
-                  <FileCode className="h-4 w-4" />
-                  Files
-                </h3>
-                {loadingFiles ? (
-                  <div className="flex items-center justify-center py-8 text-muted-foreground">
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  </div>
-                ) : (
-                  <div className="flex gap-4">
-                    <div className="w-48 shrink-0 space-y-0.5">
-                      {detailFiles.map((file) => (
-                        <button
-                          key={file}
-                          className={
-                            "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-left transition-colors " +
-                            (selectedFile === file
-                              ? "bg-primary/10 text-primary"
-                              : "hover:bg-muted text-muted-foreground hover:text-foreground")
-                          }
-                          onClick={() => handleSelectFile(file)}
-                        >
-                          <FileCode className="h-3 w-3 shrink-0" />
-                          <span className="truncate">{file}</span>
-                        </button>
-                      ))}
-                      {detailFiles.length === 0 && (
-                        <p className="py-2 text-center text-xs text-muted-foreground">
-                          No files
-                        </p>
-                      )}
-                    </div>
-                    {selectedFile && (
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-medium text-muted-foreground mb-1">
-                          {selectedFile}
-                        </div>
-                        {loadingContent ? (
-                          <div className="flex items-center justify-center py-4 text-muted-foreground">
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          </div>
-                        ) : (
-                          <pre className="max-h-80 overflow-auto rounded bg-muted p-3 text-xs font-mono whitespace-pre-wrap">
-                            {fileContent}
-                          </pre>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-          </Card>
-        </div>
-      )}
 
       {/* Delete Confirmation */}
       {showDeleteConfirm && deleteTarget && (
