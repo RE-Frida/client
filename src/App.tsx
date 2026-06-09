@@ -26,6 +26,7 @@ export default function App() {
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [connected, setConnected] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
 
   const pollAuth = useCallback(() => {
     getAuthState().then(setAuth).catch(() => {});
@@ -64,11 +65,25 @@ export default function App() {
           />
         );
       case "editor":
-        return <EditorPage selectedDevice={selectedDevice} onDeviceChange={setSelectedDevice} />;
+        return (
+          <EditorPage
+            selectedDevice={selectedDevice}
+            onDeviceChange={setSelectedDevice}
+            projectId={currentProjectId}
+            onProjectChange={setCurrentProjectId}
+          />
+        );
       case "logs":
         return <LogsPage />;
       case "marketplace":
-        return <Marketplace onUseScript={(_code) => setActiveTab("editor")} />;
+        return (
+          <Marketplace
+            onUseProject={(projectId) => {
+              setCurrentProjectId(projectId);
+              setActiveTab("editor");
+            }}
+          />
+        );
       case "settings":
         return <SettingsPage />;
       default:

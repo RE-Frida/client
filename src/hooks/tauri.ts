@@ -202,14 +202,110 @@ export async function downloadProject(projectId: string): Promise<string> {
   const home = await homeDir();
   const downloadPath = await join(home, "Documents", "RE-Frida", projectId);
   
-  // Create directory
-  const dirExists = await exists(downloadPath);
-  if (!dirExists) {
-    await mkdir(downloadPath, { recursive: true });
+  await mkdir(downloadPath, { recursive: true });
+
+  const files = await listProjectFiles(projectId);
+  for (const file of files) {
+    const content = await getProjectFile(projectId, file);
+    const filePath = await join(downloadPath, file);
+    const parent = filePath.substring(0, filePath.lastIndexOf("/"));
+    const parentExists = await exists(parent);
+    if (!parentExists) {
+      await mkdir(parent, { recursive: true });
+    }
+    await writeTextFile(filePath, content);
   }
-  
-  // TODO: Download files from server
+
   return downloadPath;
+}
+
+export async function isProjectInstalled(projectId: string): Promise<boolean> {
+  const home = await homeDir();
+  const projectPath = await join(home, "Documents", "RE-Frida", projectId);
+  return await exists(projectPath);
+}
+
+export async function getInstalledProjectIds(): Promise<string[]> {
+  const home = await homeDir();
+  const basePath = await join(home, "Documents", "RE-Frida");
+  const baseExists = await exists(basePath);
+  if (!baseExists) return [];
+
+  const entries = await readDir(basePath);
+  const ids: string[] = [];
+  for (const entry of entries) {
+    if (entry.isDirectory) {
+      ids.push(entry.name);
+    }
+  }
+  return ids;
+}
+
+export async function publishProject(
+  projectId: string,
+  workspacePath: string
+): Promise<void> {
+  const files = await readWorkspaceFiles(workspacePath);
+  for (const file of files) {
+    if (!file.isDir) {
+      const content = await readFileContent(workspacePath, file.path);
+      await updateProjectFile(projectId, file.path, content);
+    }
+  }
+}
+
+export async function getProjectDiff(
+  projectId: string,
+  workspacePath: string
+): Promise<{ serverOnly: string[]; localOnly: string[]; different: string[]; same: string[] }> {
+  const serverFiles = await listProjectFiles(projectId);
+  const localFiles = (await readWorkspaceFiles(workspacePath))
+    .filter((f) => !f.isDir)
+    .map((f) => f.path);
+
+  const serverSet = new Set(serverFiles);
+  const localSet = new Set(localFiles);
+
+  const serverOnly = serverFiles.filter((f) => !localSet.has(f));
+  const localOnly = localFiles.filter((f) => !serverSet.has(f));
+  const common = serverFiles.filter((f) => localSet.has(f));
+
+  const different: string[] = [];
+  const same: string[] = [];
+
+  for (const file of common) {
+    const localContent = await readFileContent(workspacePath, file);
+    const serverContent = await getProjectFile(projectId, file);
+    if (localContent === serverContent) {
+      same.push(file);
+    } else {
+      different.push(file);
+    }
+  }
+
+  return { serverOnly, localOnly, different, same };
+}
+
+export async function updateProjectFromServer(
+  projectId: string,
+  workspacePath: string
+): Promise<void> {
+  const serverFiles = await listProjectFiles(projectId);
+  for (const file of serverFiles) {
+    const content = await getProjectFile(projectId, file);
+    const filePath = await join(workspacePath, file);
+    const parent = filePath.substring(0, filePath.lastIndexOf("/"));
+    const parentExists = await exists(parent);
+    if (!parentExists) {
+      await mkdir(parent, { recursive: true });
+    }
+    await writeTextFile(filePath, content);
+  }
+}
+
+export async function getProjectInstallPath(projectId: string): Promise<string> {
+  const home = await homeDir();
+  return await join(home, "Documents", "RE-Frida", projectId);
 }
 
 // ─── Project API ─────────────────────────────────────────────────

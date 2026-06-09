@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import {
   Play, Square, Send, Smartphone, Package, RefreshCw, ChevronDown,
   FileCode2, FolderOpen, FolderTree, Save, Plus, FolderInput, Settings,
+  Upload, Download, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,16 +12,20 @@ import {
   getConfig, discoverDevices, startSession, executeScript, launchApp, killApp,
   selectFolder, readWorkspaceFiles, readFileContent, writeFileContent,
   loadWorkspaceConfig, saveWorkspaceConfig,
+  getProject, publishProject, getProjectDiff, updateProjectFromServer,
+  getAuthState, getProjectInstallPath,
   type WorkspaceFile, type WorkspaceConfig,
 } from "@/hooks/tauri";
-import type { AppConfig, DeviceInfo } from "@/types";
+import type { AppConfig, DeviceInfo, ProjectData } from "@/types";
 
 interface EditorPageProps {
   selectedDevice: string | null;
   onDeviceChange: (id: string | null) => void;
+  projectId?: string | null;
+  onProjectChange?: (id: string | null) => void;
 }
 
-export function EditorPage({ selectedDevice, onDeviceChange }: EditorPageProps) {
+export function EditorPage({ selectedDevice, onDeviceChange, projectId, onProjectChange }: EditorPageProps) {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [workspacePath, setWorkspacePath] = useState<string | null>(null);
@@ -33,11 +38,92 @@ export function EditorPage({ selectedDevice, onDeviceChange }: EditorPageProps) 
   const [newFileName, setNewFileName] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [projectInfo, setProjectInfo] = useState<ProjectData | null>(null);
+  const [isOwner, setIsOwner] = useState(false);
+  const [diff, setDiff] = useState<{ serverOnly: string[]; localOnly: string[]; different: string[]; same: string[] } | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [checkingDiff, setCheckingDiff] = useState(false);
 
   useEffect(() => {
     getConfig().then(setConfig).catch(() => {});
     refreshDevices();
   }, []);
+
+  // Load project if projectId is provided
+  useEffect(() => {
+    if (projectId) {
+      loadProject(projectId);
+    }
+  }, [projectId]);
+
+  const loadProject = async (pid: string) => {
+    try {
+      const path = await getProjectInstallPath(pid);
+      setWorkspacePath(path);
+      await loadFiles(path);
+      const wsConfig = await loadWorkspaceConfig(path);
+      setWorkspaceConfig(wsConfig);
+
+      const proj = await getProject(pid);
+      setProjectInfo(proj);
+
+      const auth = await getAuthState();
+      setIsOwner(auth.authenticated && auth.username === proj.author);
+
+      checkDiff(pid, path);
+    } catch (e) {
+      console.error("Failed to load project:", e);
+    }
+  };
+
+  const checkDiff = async (pid: string, path: string) => {
+    setCheckingDiff(true);
+    try {
+      const d = await getProjectDiff(pid, path);
+      setDiff(d);
+    } catch (e) {
+      console.error("Failed to check diff:", e);
+      setDiff(null);
+    } finally {
+      setCheckingDiff(false);
+    }
+  };
+
+  const refreshDiff = () => {
+    if (projectId && workspacePath) {
+      checkDiff(projectId, workspacePath);
+    }
+  };
+
+  const handlePublish = async () => {
+    if (!projectId || !workspacePath) return;
+    setPublishing(true);
+    try {
+      await publishProject(projectId, workspacePath);
+      setOutput("Project published to server");
+      refreshDiff();
+    } catch (e) {
+      setOutput("Error publishing: " + e);
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const handleUpdate = async () => {
+    if (!projectId || !workspacePath) return;
+    setUpdating(true);
+    try {
+      await updateProjectFromServer(projectId, workspacePath);
+      setOutput("Project synced from server");
+      await loadFiles(workspacePath);
+      refreshDiff();
+    } catch (e) {
+      setOutput("Error updating: " + e);
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   const refreshDevices = async () => {
     setRefreshing(true);
@@ -60,6 +146,11 @@ export function EditorPage({ selectedDevice, onDeviceChange }: EditorPageProps) 
     const folder = await selectFolder();
     if (folder) {
       setWorkspacePath(folder);
+      // Clear project context when opening a local folder
+      if (onProjectChange) onProjectChange(null);
+      setProjectInfo(null);
+      setIsOwner(false);
+      setDiff(null);
       await loadFiles(folder);
       const wsConfig = await loadWorkspaceConfig(folder);
       setWorkspaceConfig(wsConfig);
@@ -80,6 +171,8 @@ export function EditorPage({ selectedDevice, onDeviceChange }: EditorPageProps) 
       await loadFiles(workspacePath);
     }
   };
+
+  const needsUpdate = diff && (diff.serverOnly.length > 0 || diff.different.length > 0);
 
   const selectFile = async (file: WorkspaceFile) => {
     if (file.isDir || !workspacePath) return;
@@ -217,10 +310,55 @@ export function EditorPage({ selectedDevice, onDeviceChange }: EditorPageProps) 
           </Button>
           <span className="text-xs text-muted-foreground flex items-center gap-1">
             <Package className="h-3 w-3" />
-            {pkg}
+            {projectInfo?.name || pkg}
           </span>
+          {projectInfo && (
+            <span className="text-[10px] text-muted-foreground">
+              {isOwner ? "(Owner)" : `by ${projectInfo.author}`}
+            </span>
+          )}
         </div>
         <div className="flex gap-1.5">
+          {/* Project actions */}
+          {isOwner && workspacePath && (
+            <Button
+              size="sm"
+              variant="default"
+              onClick={handlePublish}
+              disabled={publishing}
+              title="Upload local files to server"
+            >
+              {publishing ? (
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              ) : (
+                <Upload className="mr-1 h-3 w-3" />
+              )}
+              Publish
+            </Button>
+          )}
+          {needsUpdate && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleUpdate}
+              disabled={updating}
+              title="Download latest files from server"
+            >
+              {updating ? (
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              ) : (
+                <Download className="mr-1 h-3 w-3" />
+              )}
+              Update
+            </Button>
+          )}
+          {checkingDiff && (
+            <Button size="sm" variant="ghost" disabled>
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              Checking...
+            </Button>
+          )}
+          <div className="w-px bg-border mx-0.5" />
           <Button size="sm" onClick={handleStart} disabled={!selectedDevice}>
             <Play className="mr-1 h-3 w-3" />
             Start

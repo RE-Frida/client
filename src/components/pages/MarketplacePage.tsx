@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Search, Download, User, Plus, Trash2, FolderOpen, Package,
-  X, Tag, ChevronRight, FileCode, Loader2,
+  X, Tag, ChevronRight, FileCode, Loader2, CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,16 +11,17 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   listProjects, createProject, deleteProject, downloadProject,
   listProjectFiles, getProjectFile, getAuthState,
+  isProjectInstalled,
 } from "@/hooks/tauri";
 import type { ProjectData, AuthState } from "@/types";
 
 interface MarketplaceProps {
-  onUseScript: (code: string) => void;
+  onUseProject: (projectId: string) => void;
 }
 
 const CATEGORIES = ["All", "Tools", "Games", "Security", "Utilities", "Other"];
 
-export function Marketplace({ onUseScript }: MarketplaceProps) {
+export function Marketplace({ onUseProject }: MarketplaceProps) {
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
@@ -40,18 +41,32 @@ export function Marketplace({ onUseScript }: MarketplaceProps) {
   const [createCategory, setCreateCategory] = useState("Tools");
   const [createTags, setCreateTags] = useState("");
   const [creating, setCreating] = useState(false);
+  const [installed, setInstalled] = useState<Set<string>>(new Set());
+  const [showInstalled, setShowInstalled] = useState(false);
+
+  const checkInstalled = useCallback(async (projects: ProjectData[]) => {
+    const result = new Set<string>();
+    for (const p of projects) {
+      try {
+        const inst = await isProjectInstalled(p.id);
+        if (inst) result.add(p.id);
+      } catch {}
+    }
+    setInstalled(result);
+  }, []);
 
   const fetchProjects = useCallback(async () => {
     setLoading(true);
     try {
       const result = await listProjects();
       setProjects(result);
+      checkInstalled(result);
     } catch (e) {
       console.error("Failed to fetch projects:", e);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [checkInstalled]);
 
   useEffect(() => {
     getAuthState().then(setAuth).catch(() => {});
@@ -69,7 +84,8 @@ export function Marketplace({ onUseScript }: MarketplaceProps) {
       p.author.toLowerCase().includes(search.toLowerCase()) ||
       p.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()));
     const matchesCategory = category === "All" || p.category === category;
-    return matchesSearch && matchesCategory;
+    const matchesInstalled = !showInstalled || installed.has(p.id);
+    return matchesSearch && matchesCategory && matchesInstalled;
   });
 
   const handleSelectProject = async (project: ProjectData) => {
@@ -108,12 +124,8 @@ export function Marketplace({ onUseScript }: MarketplaceProps) {
     setDownloading(project.id);
     try {
       await downloadProject(project.id);
-      const files = await listProjectFiles(project.id);
-      if (files.length > 0) {
-        const mainFile = files.find((f) => f === "main.js") || files.find((f) => f.endsWith(".js")) || files[0];
-        const content = await getProjectFile(project.id, mainFile);
-        onUseScript(content);
-      }
+      setInstalled((prev) => new Set(prev).add(project.id));
+      onUseProject(project.id);
     } catch (e) {
       console.error("Failed to download project:", e);
     } finally {
@@ -201,6 +213,15 @@ export function Marketplace({ onUseScript }: MarketplaceProps) {
             </Button>
           ))}
         </div>
+        <Button
+          variant={showInstalled ? "default" : "outline"}
+          size="sm"
+          onClick={() => setShowInstalled(!showInstalled)}
+          className="gap-1.5"
+        >
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          Installed
+        </Button>
       </div>
 
       {!auth?.authenticated && (
@@ -261,6 +282,12 @@ export function Marketplace({ onUseScript }: MarketplaceProps) {
                           <Download className="h-3 w-3" />
                           {project.downloads.toLocaleString()}
                         </span>
+                        {installed.has(project.id) && (
+                          <Badge variant="secondary" className="text-[10px] gap-1">
+                            <CheckCircle2 className="h-2.5 w-2.5" />
+                            Installed
+                          </Badge>
+                        )}
                         <div className="flex gap-1">
                           {project.tags.slice(0, 3).map((tag) => (
                             <Badge key={tag} variant="outline" className="text-[10px]">
@@ -404,7 +431,7 @@ export function Marketplace({ onUseScript }: MarketplaceProps) {
                       size="sm"
                       className="mt-2 w-full"
                       onClick={() => {
-                        if (fileContent) onUseScript(fileContent);
+                        if (selectedProject) onUseProject(selectedProject.id);
                       }}
                     >
                       Use This File
