@@ -31,8 +31,6 @@ export function SettingsPage() {
     }
   };
 
-  const isStandardTheme = ["dark", "light", "system"].includes(config.settings.theme);
-
   const themeGroups = [
     {
       label: "Standard",

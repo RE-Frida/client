@@ -14,7 +14,7 @@ import { listen } from "@tauri-apps/api/event";
 import CodeMirror from "@uiw/react-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
 import { oneDark } from "@codemirror/theme-one-dark";
-import type { DeviceInfo } from "@/types";
+import type { DeviceInfo, AppConfig } from "@/types";
 
 interface InjectionPageProps {
   selectedDevice: string | null;
