@@ -19,7 +19,7 @@ function isLightColor(hex: string): boolean {
   return (r * 299 + g * 587 + b * 114) / 1000 > 128;
 }
 
-export function applyTheme(theme: string, accentColor?: string) {
+export function applyTheme(theme: string, accentColor?: string, bgImage?: string) {
   if (theme === "system") {
     const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
@@ -38,5 +38,11 @@ export function applyTheme(theme: string, accentColor?: string) {
     root.style.removeProperty("--color-ring");
     root.style.removeProperty("--color-sidebar-ring");
     root.style.removeProperty("--color-primary-foreground");
+  }
+
+  if (bgImage) {
+    root.style.setProperty("--bg-image", `url("${bgImage}")`);
+  } else {
+    root.style.removeProperty("--bg-image");
   }
 }

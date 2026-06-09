@@ -25,6 +25,8 @@ pub struct AppSettings {
     pub advanced_mode: bool,
     #[serde(default)]
     pub accent_color: Option<String>,
+    #[serde(default)]
+    pub background_image: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,6 +52,7 @@ impl Default for AppSettings {
             custom_package: DEFAULT_PACKAGE.to_string(),
             advanced_mode: false,
             accent_color: None,
+            background_image: None,
         }
     }
 }
