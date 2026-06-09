@@ -211,3 +211,54 @@ export async function downloadProject(projectId: string): Promise<string> {
   // TODO: Download files from server
   return downloadPath;
 }
+
+// ─── Project API ─────────────────────────────────────────────────
+
+export async function listProjects(): Promise<ProjectData[]> {
+  return invoke("list_projects");
+}
+
+export async function getProject(projectId: string): Promise<ProjectData> {
+  return invoke("get_project", { projectId });
+}
+
+export async function createProject(
+  name: string,
+  description: string,
+  icon: string,
+  category: string,
+  tags: string[]
+): Promise<ProjectData> {
+  return invoke("create_project", { name, description, icon, category, tags });
+}
+
+export async function updateProject(
+  id: string,
+  name?: string,
+  description?: string,
+  icon?: string,
+  category?: string,
+  tags?: string[]
+): Promise<ProjectData> {
+  return invoke("update_project", { id, name, description, icon, category, tags });
+}
+
+export async function deleteProject(projectId: string): Promise<void> {
+  return invoke("delete_project", { projectId });
+}
+
+export async function listProjectFiles(projectId: string): Promise<string[]> {
+  return invoke("list_project_files", { projectId });
+}
+
+export async function getProjectFile(projectId: string, path: string): Promise<string> {
+  return invoke("get_project_file", { projectId, path });
+}
+
+export async function updateProjectFile(
+  projectId: string,
+  path: string,
+  content: string
+): Promise<void> {
+  return invoke("update_project_file", { projectId, path, content });
+}
