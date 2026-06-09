@@ -90,38 +90,17 @@ pub async fn execute_script(
 ) -> Result<String, String> {
     dbg_log!("execute_script on device {}", device_id);
 
-    let port = state.config.lock().unwrap().settings.frida_port;
-
-    // 1. ADB port forward
-    state.add_log(format!("Port forwarding tcp:{} on {}", port, device_id));
-    let forward = StdCommand::new(&state.adb_path)
-        .arg("-s")
-        .arg(&device_id)
-        .arg("forward")
-        .arg(format!("tcp:{}", port))
-        .arg(format!("tcp:{}", port))
-        .output()
-        .map_err(|e| format!("Port forward failed: {}", e))?;
-
-    if !forward.status.success() {
-        let stderr = String::from_utf8_lossy(&forward.stderr);
-        return Err(format!("ADB port forward error: {}", stderr));
-    }
-    state.add_log("Port forward OK".to_string());
-
-    // 2. Write script to temp file
     let tmp_dir = std::env::temp_dir();
     let script_path = tmp_dir.join("re-frida-script.js");
     std::fs::write(&script_path, &script_code)
         .map_err(|e| format!("Failed to write script: {}", e))?;
 
     let script_str = script_path.to_str().unwrap_or("");
-    state.add_log(format!("Executing script on {} (port {})", device_id, port));
+    state.add_log(format!("Executing script on {} via USB", device_id));
 
-    // 3. Spawn frida with piped I/O
     let mut child = tokio::process::Command::new(&state.frida_path)
-        .arg("-H")
-        .arg(format!("127.0.0.1:{}", port))
+        .arg("-D")
+        .arg(&device_id)
         .arg("-n")
         .arg("Gadget")
         .arg("-l")
