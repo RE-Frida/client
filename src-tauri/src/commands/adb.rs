@@ -3,6 +3,7 @@ use tauri::State;
 
 use crate::state::{AppState, dbg_log};
 use crate::types::DeviceInfo;
+use crate::config::DEFAULT_FRIDA_INSTALL;
 
 #[tauri::command]
 pub async fn discover_devices(state: State<'_, AppState>) -> Result<Vec<DeviceInfo>, String> {
@@ -84,9 +85,8 @@ pub async fn execute_script(
     state: State<'_, AppState>,
     device_id: String,
     script_code: String,
-    use_gadget: bool,
 ) -> Result<String, String> {
-    dbg_log!("execute_script on device {} (gadget={})", device_id, use_gadget);
+    dbg_log!("execute_script on device {}", device_id);
 
     let tmp_dir = std::env::temp_dir();
     let script_path = tmp_dir.join("re-frida-script.js");
@@ -95,25 +95,16 @@ pub async fn execute_script(
 
     state.add_log(format!("Executing script on {}", device_id));
 
-    let result = if use_gadget {
-        let port = state.config.lock().unwrap().settings.frida_port;
-        Command::new(&state.frida_path)
-            .arg("-H")
-            .arg(format!("127.0.0.1:{}", port))
-            .arg("-l")
-            .arg(script_path.to_str().unwrap_or(""))
-            .arg("--no-pause")
-            .output()
-    } else {
-        Command::new(&state.frida_path)
-            .arg("-U")
-            .arg("-n")
-            .arg("Gadget")
-            .arg("-l")
-            .arg(script_path.to_str().unwrap_or(""))
-            .arg("--no-pause")
-            .output()
-    };
+    let port = state.config.lock().unwrap().settings.frida_port;
+    let result = Command::new(&state.frida_path)
+        .arg("-H")
+        .arg(format!("127.0.0.1:{}", port))
+        .arg("-n")
+        .arg("Gadget")
+        .arg("-l")
+        .arg(script_path.to_str().unwrap_or(""))
+        .arg("--no-pause")
+        .output();
 
     let _ = std::fs::remove_file(&script_path);
 
@@ -127,13 +118,23 @@ pub async fn execute_script(
                 state.add_log("Script executed successfully".to_string());
                 Ok(if stdout.is_empty() { stderr } else { stdout })
             } else {
-                state.add_log(format!("Script error: {}", stderr));
-                Err(stderr)
+                let error_msg = if stderr.contains("No such file") || stderr.contains("not found") {
+                    format!("Frida not found. {}\n\n{}", DEFAULT_FRIDA_INSTALL, stderr)
+                } else {
+                    stderr
+                };
+                state.add_log(format!("Script error: {}", error_msg));
+                Err(error_msg)
             }
         }
         Err(e) => {
-            state.add_log(format!("Execution error: {}", e));
-            Err(format!("frida failed: {}", e))
+            let error_msg = if e.to_string().contains("No such file") || e.to_string().contains("not found") {
+                format!("Frida not found. {}\n\n({})", DEFAULT_FRIDA_INSTALL, e)
+            } else {
+                format!("frida failed: {}", e)
+            };
+            state.add_log(error_msg.clone());
+            Err(error_msg)
         }
     }
 }

@@ -100,7 +100,7 @@ pub struct AppState {
 impl AppState {
     pub fn new() -> Self {
         let adb_path = find_binary("adb");
-        let frida_path = find_binary("frida-inject");
+        let frida_path = find_binary("frida");
         let config = load_config();
         dbg_log!("ADB path: {}", adb_path);
         dbg_log!("Frida path: {}", frida_path);

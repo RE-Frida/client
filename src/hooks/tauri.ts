@@ -20,10 +20,9 @@ export async function stopSession(): Promise<string> {
 
 export async function executeScript(
   deviceId: string,
-  scriptCode: string,
-  useGadget: boolean = false
+  scriptCode: string
 ): Promise<string> {
-  return invoke("execute_script", { deviceId, scriptCode, useGadget });
+  return invoke("execute_script", { deviceId, scriptCode });
 }
 
 export async function pushGadget(
