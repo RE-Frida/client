@@ -38,4 +38,4 @@ export interface AuthState {
   token: string | null;
 }
 
-export type TabId = "dashboard" | "marketplace" | "logs" | "settings";
+export type TabId = "dashboard" | "editor" | "marketplace" | "logs" | "settings";

@@ -1,6 +1,7 @@
 import {
   LayoutDashboard,
   Store,
+  Code2,
   ScrollText,
   Settings,
   Zap,
@@ -19,6 +20,7 @@ interface SidebarProps {
 
 const navItems: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "editor", label: "Editor", icon: Code2 },
   { id: "marketplace", label: "Marketplace", icon: Store },
   { id: "logs", label: "Logs", icon: ScrollText },
   { id: "settings", label: "Settings", icon: Settings },

@@ -1,54 +1,28 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  Play, Square, Send, Smartphone, Package, RefreshCw,
-  FileCode2, FolderOpen, FolderTree, Save, Plus, ChevronDown,
+  Smartphone, RefreshCw, ChevronDown, User, Cpu, Wifi, Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { ScriptEditor } from "@/components/ui/script-editor";
-import {
-  getConfig, discoverDevices, startSession, executeScript, launchApp, killApp,
-} from "@/hooks/tauri";
-import type { AppConfig, DeviceInfo } from "@/types";
-
-interface FileNode {
-  name: string;
-  type: "file" | "folder";
-  children?: FileNode[];
-  content?: string;
-}
-
-const INITIAL_TREE: FileNode[] = [
-  {
-    name: "scripts",
-    type: "folder",
-    children: [
-      { name: "main.js", type: "file", content: "// Frida script\nJava.perform(function() {\n  var MainActivity = Java.use(\"com.target.app.MainActivity\");\n  MainActivity.onCreate.implementation = function(savedInstanceState) {\n    console.log(\"[*] onCreate called\");\n    this.onCreate(savedInstanceState);\n  };\n});" },
-      { name: "hooks", type: "folder", children: [
-        { name: "crypto.js", type: "file", content: "// Crypto hooks\nJava.perform(function() {\n  var Cipher = Java.use('javax.crypto.Cipher');\n  Cipher.doFinal.overload('[B').implementation = function(input) {\n    console.log('[*] Cipher.doFinal called');\n    return this.doFinal(input);\n  };\n});" },
-      ]},
-    ],
-  },
-];
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { discoverDevices, getAuthState, isConnected, getConfig } from "@/hooks/tauri";
+import type { DeviceInfo, AuthState, AppConfig } from "@/types";
 
 interface DashboardProps {
   selectedDevice: string | null;
   onDeviceChange: (id: string | null) => void;
+  onNavigateToEditor: () => void;
 }
 
-export function Dashboard({ selectedDevice, onDeviceChange }: DashboardProps) {
-  const [config, setConfig] = useState<AppConfig | null>(null);
+export function Dashboard({ selectedDevice, onDeviceChange, onNavigateToEditor }: DashboardProps) {
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
-  const [tree, setTree] = useState<FileNode[]>(INITIAL_TREE);
-  const [selectedFile, setSelectedFile] = useState<FileNode | null>(null);
-  const [code, setCode] = useState("");
-  const [output, setOutput] = useState("");
-  const [running, setRunning] = useState(false);
-  const [newFileName, setNewFileName] = useState("");
+  const [auth, setAuth] = useState<AuthState | null>(null);
+  const [config, setConfig] = useState<AppConfig | null>(null);
+  const [connected, setConnected] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
+    getAuthState().then(setAuth).catch(() => {});
+    isConnected().then(setConnected).catch(() => {});
     getConfig().then(setConfig).catch(() => {});
     refreshDevices();
   }, []);
@@ -71,201 +45,134 @@ export function Dashboard({ selectedDevice, onDeviceChange }: DashboardProps) {
     }
   }, [selectedDevice, onDeviceChange]);
 
-  const pkg = config?.custom_package || "com.target.app";
-
-  const selectFile = (node: FileNode) => {
-    if (node.type === "file") {
-      setSelectedFile(node);
-      setCode(node.content || "");
-    }
-  };
-
-  const saveFile = () => {
-    if (!selectedFile) return;
-    selectedFile.content = code;
-    setOutput("Saved " + selectedFile.name);
-  };
-
-  const addFile = () => {
-    if (!newFileName) return;
-    const name = newFileName.endsWith(".js") ? newFileName : newFileName + ".js";
-    const newFile: FileNode = { name, type: "file", content: "// New script\n" };
-    setTree((prev) => [...prev, newFile]);
-    setNewFileName("");
-  };
-
-  const handleStart = async () => {
-    if (!selectedDevice) return;
-    try {
-      await startSession(selectedDevice);
-      const result = await launchApp(selectedDevice, pkg);
-      setOutput(result);
-    } catch (e) {
-      setOutput("Error: " + e);
-    }
-  };
-
-  const handleStop = async () => {
-    if (!selectedDevice) return;
-    try {
-      const result = await killApp(selectedDevice, pkg);
-      setOutput(result);
-    } catch (e) {
-      setOutput("Error: " + e);
-    }
-  };
-
-  const handleExecute = async () => {
-    if (!selectedDevice || !selectedFile) return;
-    setRunning(true);
-    try {
-      const result = await executeScript(selectedDevice, code);
-      setOutput(result);
-    } catch (e) {
-      setOutput("Error: " + e);
-    } finally {
-      setRunning(false);
-    }
-  };
-
-  const renderTree = (nodes: FileNode[], depth = 0) => {
-    return nodes.map((node) => (
-      <div key={node.name + depth} style={{ paddingLeft: depth * 16 }}>
-        <button
-          onClick={() => selectFile(node)}
-          className={
-            "flex w-full items-center gap-2 rounded px-2 py-1 text-xs transition-colors " +
-            (selectedFile?.name === node.name
-              ? "bg-accent text-accent-foreground"
-              : "hover:bg-accent/50")
-          }
-        >
-          {node.type === "folder" ? (
-            <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
-          ) : (
-            <FileCode2 className="h-3.5 w-3.5 text-primary" />
-          )}
-          <span className="truncate">{node.name}</span>
-        </button>
-        {node.children && renderTree(node.children, depth + 1)}
-      </div>
-    ));
-  };
+  const selectedDev = devices.find((d) => d.id === selectedDevice);
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Top Toolbar */}
-      <div className="flex items-center justify-between border-b border-border px-3 py-2">
-        <div className="flex items-center gap-3">
-          {/* Device Picker */}
-          <div className="relative">
-            <select
-              value={selectedDevice || ""}
-              onChange={(e) => onDeviceChange(e.target.value || null)}
-              className="appearance-none rounded-md border border-border bg-background py-1.5 pl-8 pr-8 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              {devices.length === 0 ? (
-                <option value="">No devices</option>
-              ) : (
-                devices.map((dev) => (
-                  <option key={dev.id} value={dev.id}>
-                    {dev.model || dev.id} ({dev.status})
-                  </option>
-                ))
-              )}
-            </select>
-            <Smartphone className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
-          </div>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={refreshDevices} disabled={refreshing}>
-            <RefreshCw className={"h-3.5 w-3.5" + (refreshing ? " animate-spin" : "")} />
-          </Button>
-          <span className="text-xs text-muted-foreground flex items-center gap-1">
-            <Package className="h-3 w-3" />
-            {pkg}
-          </span>
-        </div>
-        <div className="flex gap-1.5">
-          <Button size="sm" onClick={handleStart} disabled={!selectedDevice}>
-            <Play className="mr-1 h-3 w-3" />
-            Start
-          </Button>
-          <Button variant="destructive" size="sm" onClick={handleStop} disabled={!selectedDevice}>
-            <Square className="mr-1 h-3 w-3" />
-            Stop
-          </Button>
-          <Button variant="secondary" size="sm" onClick={handleExecute} disabled={!selectedDevice || !selectedFile || running}>
-            <Send className="mr-1 h-3 w-3" />
-            Execute
-          </Button>
-        </div>
+    <div className="flex h-full flex-col gap-4 p-4">
+      <div>
+        <h2 className="text-2xl font-bold">Dashboard</h2>
+        <p className="text-sm text-muted-foreground">Device management and overview</p>
       </div>
 
-      {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* File Explorer */}
-        <div className="flex w-52 flex-col border-r border-border bg-sidebar">
-          <div className="flex items-center justify-between border-b border-border px-3 py-1.5">
-            <span className="text-xs font-medium flex items-center gap-1.5">
-              <FolderTree className="h-3.5 w-3.5" />
-              Files
-            </span>
-          </div>
-          <ScrollArea className="flex-1 p-1.5">
-            {renderTree(tree)}
-          </ScrollArea>
-          <div className="border-t border-border p-1.5">
-            <div className="flex gap-1">
-              <Input
-                placeholder="new file.js"
-                value={newFileName}
-                onChange={(e) => setNewFileName(e.target.value)}
-                className="h-6 text-xs"
-                onKeyDown={(e) => e.key === "Enter" && addFile()}
-              />
-              <Button size="sm" className="h-6 px-1.5" onClick={addFile}>
-                <Plus className="h-3 w-3" />
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* Device Picker */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Smartphone className="h-4 w-4" />
+              Device
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="relative">
+              <select
+                value={selectedDevice || ""}
+                onChange={(e) => onDeviceChange(e.target.value || null)}
+                className="w-full appearance-none rounded-md border border-border bg-background py-2 pl-3 pr-8 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                {devices.length === 0 ? (
+                  <option value="">No devices found</option>
+                ) : (
+                  devices.map((dev) => (
+                    <option key={dev.id} value={dev.id}>
+                      {dev.model || dev.id} ({dev.status})
+                    </option>
+                  ))
+                )}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">
+                {devices.length} device{devices.length !== 1 ? "s" : ""} found
+              </span>
+              <Button variant="ghost" size="sm" onClick={refreshDevices} disabled={refreshing}>
+                <RefreshCw className={"mr-1 h-3 w-3" + (refreshing ? " animate-spin" : "")} />
+                Refresh
               </Button>
             </div>
-          </div>
-        </div>
-
-        {/* Editor + Output */}
-        <div className="flex flex-1 flex-col overflow-hidden">
-          {/* File Header */}
-          <div className="flex items-center justify-between border-b border-border px-3 py-1.5">
-            <div className="flex items-center gap-2 text-xs">
-              <FileCode2 className="h-3.5 w-3.5 text-primary" />
-              {selectedFile ? selectedFile.name : "No file open"}
-            </div>
-            <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={saveFile} disabled={!selectedFile}>
-              <Save className="mr-1 h-3 w-3" />
-              Save
-            </Button>
-          </div>
-
-          {/* Code Editor */}
-          <div className="flex-1 overflow-hidden">
-            {selectedFile ? (
-              <ScriptEditor value={code} onChange={setCode} />
-            ) : (
-              <div className="flex h-full items-center justify-center text-muted-foreground">
-                <div className="text-center">
-                  <FileCode2 className="mx-auto h-10 w-10 mb-2 opacity-20" />
-                  <p className="text-sm">Select a file to edit</p>
+            {selectedDev && (
+              <div className="rounded-lg border border-border p-3 text-xs">
+                <div className="font-medium">{selectedDev.model || "Unknown Model"}</div>
+                <div className="text-muted-foreground">{selectedDev.id}</div>
+                <div className="mt-1">
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                    selectedDev.status === "device" ? "bg-green-500/10 text-green-500" : "bg-muted text-muted-foreground"
+                  }`}>
+                    {selectedDev.status}
+                  </span>
                 </div>
               </div>
             )}
-          </div>
+          </CardContent>
+        </Card>
 
-          {/* Output */}
-          {output && (
-            <div className="border-t border-border max-h-[120px] overflow-auto">
-              <pre className="bg-muted p-2 text-xs font-mono whitespace-pre-wrap">{output}</pre>
+        {/* Account Info */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <User className="h-4 w-4" />
+              Account
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {auth?.authenticated ? (
+              <div className="flex items-center gap-3">
+                {auth.avatar_url && (
+                  <img
+                    src={auth.avatar_url}
+                    alt="avatar"
+                    className="h-10 w-10 rounded-full"
+                  />
+                )}
+                <div>
+                  <div className="font-medium">{auth.username}</div>
+                  <div className="text-xs text-muted-foreground">Discord</div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">Not logged in</div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Connection Status */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Wifi className="h-4 w-4" />
+              Connection
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className={`h-2.5 w-2.5 rounded-full ${connected ? "bg-green-500" : "bg-red-500"}`} />
+              <span className="text-sm">{connected ? "Connected to server" : "Disconnected"}</span>
             </div>
-          )}
-        </div>
+            <div className="text-xs text-muted-foreground">
+              Package: {config?.custom_package || "com.target.app"}
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Quick Actions */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Zap className="h-4 w-4" />
+            Quick Actions
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-3">
+            <Button onClick={onNavigateToEditor}>
+              <Cpu className="mr-2 h-4 w-4" />
+              Open Editor
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
