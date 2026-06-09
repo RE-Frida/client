@@ -55,10 +55,10 @@ export function Dashboard() {
                 <User className="h-6 w-6 text-muted-foreground" />
               </div>
               {auth?.authenticated && (
-                <>
-                  <span className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-card bg-green-500" />
-                  <span className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-transparent bg-green-500/40 animate-pulse-ring" />
-                </>
+                <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3">
+                  <span className="absolute inset-0 rounded-full bg-green-500 ring-2 ring-card" />
+                  <span className="absolute inset-0 rounded-full animate-pulse-ring" />
+                </div>
               )}
             </div>
             <div className="flex-1 min-w-0">
@@ -104,16 +104,18 @@ export function Dashboard() {
                   : "Unable to reach server"}
               </p>
             </div>
-            <div className="relative ml-auto">
-              <span
-                className={
-                  "inline-flex h-2.5 w-2.5 rounded-full " +
-                  (connected ? "bg-green-500" : "bg-red-500")
-                }
-              />
-              {connected && (
-                <span className="absolute -inset-1 rounded-full bg-green-500/30 animate-pulse-ring-subtle" />
-              )}
+            <div className="ml-auto">
+              <div className="relative h-2.5 w-2.5">
+                <span
+                  className={
+                    "absolute inset-0 rounded-full " +
+                    (connected ? "bg-green-500" : "bg-red-500")
+                  }
+                />
+                {connected && (
+                  <span className="absolute inset-0 rounded-full animate-pulse-ring" />
+                )}
+              </div>
             </div>
           </div>
         </div>
