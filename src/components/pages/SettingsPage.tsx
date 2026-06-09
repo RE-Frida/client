@@ -231,7 +231,6 @@ export function SettingsPage() {
                   )}
                 </div>
               </div>
-            )}
           </CardContent>
         </Card>
 
