@@ -110,7 +110,7 @@ pub async fn execute_script(
         .map_err(|e| {
             let _ = std::fs::remove_file(&script_path);
             if e.to_string().contains("No such file") || e.to_string().contains("not found") {
-                "Frida not found.\n\nInstall: pip install frida-tools".to_string()
+                "Frida not found.\n\nInstall: pip install frida".to_string()
             } else {
                 format!("frida-inject failed: {}", e)
             }
