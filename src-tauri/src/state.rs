@@ -26,7 +26,7 @@ pub(crate) use dbg_log;
 
 // ─── Constants ──────────────────────────────────────────────────
 
-pub const SERVER_URL: &str = "wss://re-frida.nullbyte.rip:26202/ws";
+pub const SERVER_URL: &str = "wss://78.80.45.23:26202/ws";
 pub const OAUTH_CALLBACK_PORT: u16 = 17642;
 
 // ─── WS Client ──────────────────────────────────────────────────
