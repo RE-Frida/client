@@ -74,8 +74,9 @@ export default function App() {
           }}
         />
         <ToastContainer toasts={toasts} />
-      </div>
-    );
+    </div>
+  );
+}
   }
 
   return (
@@ -116,6 +117,7 @@ export default function App() {
     </div>
   );
 }
+
 
 function ToastContainer({ toasts }: { toasts: ToastItem[] }) {
   return (
