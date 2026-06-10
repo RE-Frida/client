@@ -98,6 +98,7 @@ pub struct AppState {
     pub connected: Arc<Mutex<bool>>,
     pub frida_stdin: Arc<AsyncMutex<Option<ChildStdin>>>,
     pub frida_child: Arc<AsyncMutex<Option<Child>>>,
+    pub frida_pid: Arc<Mutex<Option<u32>>>,
 }
 
 impl AppState {
@@ -126,6 +127,7 @@ impl AppState {
             connected: Arc::new(Mutex::new(false)),
             frida_stdin: Arc::new(AsyncMutex::new(None)),
             frida_child: Arc::new(AsyncMutex::new(None)),
+            frida_pid: Arc::new(Mutex::new(None)),
         }
     }
 

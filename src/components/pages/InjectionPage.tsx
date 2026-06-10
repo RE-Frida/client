@@ -115,7 +115,7 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
   const handleStart = async () => {
     if (!selectedDevice) return;
     try {
-      showToast("Starting session...", "info");
+      showToast("Launching app...", "info");
       const result = await startSession(selectedDevice);
       showToast(result, "success");
       if (pkg) {
@@ -130,15 +130,15 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
   const handleStop = async () => {
     if (!selectedDevice) return;
     try {
-      const result = await stopFridaConsole();
+      await stopFridaConsole();
       setConsoleRunning(false);
       setInputBuffer("");
-      showToast(result, "info");
+      showToast("App killed", "info");
       if (pkg) {
         await killApp(selectedDevice, pkg);
       }
     } catch (e) {
-      showToast("Stop failed: " + e, "error");
+      showToast("Kill failed: " + e, "error");
     }
   };
 
@@ -224,7 +224,7 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
           <Button
             size="sm"
             onClick={handleStart}
-            disabled={!selectedDevice}
+            disabled={devices.length === 0}
             className="h-7 text-xs px-2"
           >
             <Play className="mr-1 h-3 w-3" />
@@ -234,7 +234,7 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
             variant="default"
             size="sm"
             onClick={handleExecute}
-            disabled={!selectedDevice || !scriptPath}
+            disabled={devices.length === 0 || !scriptPath}
             className="h-7 text-xs px-2"
           >
             <Send className="mr-1 h-3 w-3" />
@@ -244,7 +244,7 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
             variant="destructive"
             size="sm"
             onClick={handleStop}
-            disabled={!selectedDevice}
+            disabled={devices.length === 0}
             className="h-7 text-xs px-2"
           >
             <Square className="mr-1 h-3 w-3" />

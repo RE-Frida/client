@@ -90,6 +90,9 @@ pub async fn execute_script_console(
     dbg_log!("execute_script_console on device {}", device_id);
 
     // Kill any existing frida process first
+    if let Some(pid) = state.frida_pid.lock().unwrap().take() {
+        let _ = StdCommand::new("kill").arg("-9").arg(pid.to_string()).output();
+    }
     {
         let mut child_guard = state.frida_child.lock().await;
         if let Some(mut child) = child_guard.take() {
@@ -120,10 +123,12 @@ pub async fn execute_script_console(
             }
         })?;
 
+    let pid = child.id();
     let stdin = child.stdin.take().ok_or("No stdin")?;
     let stdout = child.stdout.take().ok_or("No stdout")?;
     let stderr = child.stderr.take().ok_or("No stderr")?;
 
+    *state.frida_pid.lock().unwrap() = pid;
     *state.frida_stdin.lock().await = Some(stdin);
     *state.frida_child.lock().await = Some(child);
 
@@ -154,11 +159,13 @@ pub async fn execute_script_console(
     // Monitor process exit
     let child_monitor = state.frida_child.clone();
     let stdin_monitor = state.frida_stdin.clone();
+    let pid_monitor = state.frida_pid.clone();
     let app_done = app_handle.clone();
     tokio::spawn(async move {
         let mut guard = child_monitor.lock().await;
         if let Some(mut child) = guard.take() {
             let status = child.wait().await;
+            *pid_monitor.lock().unwrap() = None;
             *stdin_monitor.lock().await = None;
             let _ = app_done.emit("frida-done", serde_json::json!({
                 "success": status.map(|s| s.success()).unwrap_or(false),
@@ -192,6 +199,9 @@ pub async fn send_frida_input(
 pub async fn stop_frida_console(
     state: State<'_, AppState>,
 ) -> Result<String, String> {
+    if let Some(pid) = state.frida_pid.lock().unwrap().take() {
+        let _ = StdCommand::new("kill").arg("-9").arg(pid.to_string()).output();
+    }
     let mut child_guard = state.frida_child.lock().await;
     if let Some(mut child) = child_guard.take() {
         let _ = child.kill().await;
