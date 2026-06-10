@@ -157,7 +157,7 @@ pub async fn connect_ws(state: AppState) {
     *state.ws.write().await = Some(client);
 
     // Report client version to server and check for version rejection
-    let version = env!("CARGO_PKG_VERSION").to_string();
+    let version = app_version_from_config();
     let ci_id = uuid::Uuid::new_v4().to_string();
     let (ci_tx, mut ci_rx) = tokio::sync::oneshot::channel::<Response>();
     pending.lock().unwrap().insert(ci_id.clone(), ci_tx);
@@ -320,4 +320,16 @@ pub async fn start_oauth_callback_server() -> mpsc::Receiver<String> {
     });
 
     rx
+}
+
+/// Read the app version from tauri.conf.json at compile time.
+/// This matches the GitHub release tag version, not the workspace Cargo.toml.
+fn app_version_from_config() -> String {
+    let config: serde_json::Value = serde_json::from_str(include_str!("../tauri.conf.json"))
+        .unwrap_or_default();
+    config
+        .get("version")
+        .and_then(|v| v.as_str())
+        .unwrap_or("0.0.0")
+        .to_string()
 }

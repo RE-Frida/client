@@ -51,7 +51,14 @@ async fn get_client_version_error(state: tauri::State<'_, AppState>) -> Result<O
 
 #[tauri::command]
 async fn get_app_version() -> Result<String, String> {
-    Ok(env!("CARGO_PKG_VERSION").to_string())
+    let config: serde_json::Value = serde_json::from_str(include_str!("../tauri.conf.json"))
+        .unwrap_or_default();
+    let version = config
+        .get("version")
+        .and_then(|v| v.as_str())
+        .unwrap_or("0.0.0")
+        .to_string();
+    Ok(version)
 }
 
 #[tauri::command]
