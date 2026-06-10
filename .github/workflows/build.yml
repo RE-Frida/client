@@ -3,20 +3,17 @@ name: Build Client
 on:
   push:
     branches: [main]
-    tags: ["v[0-9]*"]
   workflow_dispatch:
 
 concurrency:
-  group: client-${{ github.ref }}
-  cancel-in-progress: true
+  group: client-build
 
 jobs:
   version:
-    if: |
-      (github.event_name == 'push' && github.actor != 'github-actions[bot]') ||
-      github.event_name == 'workflow_dispatch'
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     outputs:
+      new: ${{ steps.bump.outputs.new }}
       tag: ${{ steps.bump.outputs.tag }}
     permissions:
       contents: write
@@ -33,17 +30,17 @@ jobs:
           echo "tag=v${NEW_VERSION}" >> $GITHUB_OUTPUT
           sed -i "s/\"version\": \"${CURRENT}\"/\"version\": \"${NEW_VERSION}\"/" src-tauri/tauri.conf.json
 
-      - name: Commit and push (on main push)
+      - name: Commit bump and push tag (on push)
         if: github.event_name == 'push'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add src-tauri/tauri.conf.json
-          git commit -m "chore: bump version to ${{ steps.bump.outputs.new }}"
+          git commit -m "chore: bump version to ${{ steps.bump.outputs.new }} [skip ci]"
           git tag ${{ steps.bump.outputs.tag }}
           git push origin main --tags
 
-      - name: Push tag only (on dispatch)
+      - name: Commit bump and push tag only (on dispatch)
         if: github.event_name == 'workflow_dispatch'
         run: |
           git config user.name "github-actions[bot]"
@@ -54,7 +51,7 @@ jobs:
           git push origin ${{ steps.bump.outputs.tag }}
 
   build:
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [version]
     name: Build (${{ matrix.os }}, ${{ matrix.profile }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -84,6 +81,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.tag }}
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -194,31 +193,21 @@ jobs:
           path: target/${{ matrix.target }}/release/${{ matrix.artifact }}*
 
   release:
-    name: Release
-    if: github.ref_type == 'tag'
-    needs: [build]
+    needs: [version, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
-
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Derive version from tag
-        id: version
-        run: |
-          TAG="${GITHUB_REF#refs/tags/v}"
-          echo "version=${TAG}" >> $GITHUB_OUTPUT
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: "RE:Frida Client ${{ steps.version.outputs.version }}"
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: "RE:Frida Client ${{ needs.version.outputs.new }}"
           generate_release_notes: true
           files: artifacts/**/*
