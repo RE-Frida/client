@@ -85,7 +85,7 @@ pub async fn execute_script_console(
     app_handle: tauri::AppHandle,
     state: State<'_, AppState>,
     device_id: String,
-    script_code: String,
+    script_path: String,
 ) -> Result<String, String> {
     dbg_log!("execute_script_console on device {}", device_id);
 
@@ -99,14 +99,6 @@ pub async fn execute_script_console(
     }
     *state.frida_stdin.lock().await = None;
 
-    // Write script to temp file
-    let tmp_dir = std::env::temp_dir();
-    let script_path = tmp_dir.join("re-frida-script.js");
-    std::fs::write(&script_path, &script_code)
-        .map_err(|e| format!("Failed to write script: {}", e))?;
-
-    let script_str = script_path.to_str().unwrap_or("");
-
     let mut child = tokio::process::Command::new(&state.frida_path)
         .env("PYTHONUNBUFFERED", "1")
         .env("TERM", "dumb")
@@ -115,13 +107,12 @@ pub async fn execute_script_console(
         .arg("-n")
         .arg("Gadget")
         .arg("-l")
-        .arg(script_str)
+        .arg(&script_path)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| {
-            let _ = std::fs::remove_file(&script_path);
             if e.to_string().contains("No such file") || e.to_string().contains("not found") {
                 "Frida not found.\n\nInstall: pip install frida".to_string()
             } else {
@@ -165,7 +156,6 @@ pub async fn execute_script_console(
     let stdin_monitor = state.frida_stdin.clone();
     let app_done = app_handle.clone();
     tokio::spawn(async move {
-        // Wait for process to exit
         let mut guard = child_monitor.lock().await;
         if let Some(mut child) = guard.take() {
             let status = child.wait().await;
@@ -174,13 +164,6 @@ pub async fn execute_script_console(
                 "success": status.map(|s| s.success()).unwrap_or(false),
             }));
         }
-    });
-
-    // Clean up temp file
-    let sp = script_path.clone();
-    tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-        let _ = std::fs::remove_file(&sp);
     });
 
     state.add_log(format!("Frida console started on {} with script", device_id));

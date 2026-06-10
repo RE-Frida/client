@@ -9,7 +9,6 @@ import {
   stopFridaConsole, sendFridaInput, launchApp, killApp,
 } from "@/hooks/tauri";
 import { open } from "@tauri-apps/plugin-dialog";
-import { readTextFile } from "@tauri-apps/plugin-fs";
 import { listen } from "@tauri-apps/api/event";
 import { showToast } from "@/lib/toast";
 import type { DeviceInfo, AppConfig } from "@/types";
@@ -24,7 +23,6 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [scriptPath, setScriptPath] = useState<string | null>(null);
-  const [scriptCode, setScriptCode] = useState("");
   const [output, setOutput] = useState("");
   const [inputBuffer, setInputBuffer] = useState("");
   const [consoleRunning, setConsoleRunning] = useState(false);
@@ -71,12 +69,6 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
     });
     if (selected) {
       setScriptPath(selected);
-      try {
-        const content = await readTextFile(selected);
-        setScriptCode(content);
-      } catch (e) {
-        showToast("Error reading script: " + e, "error");
-      }
     }
   };
 
@@ -102,16 +94,16 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
   }, []);
 
   const handleExecute = async () => {
-    if (!selectedDevice || !scriptCode.trim()) {
+    if (!selectedDevice || !scriptPath) {
       showToast("Select a script first", "info");
       return;
     }
     try {
       await startListening();
-      const name = scriptPath?.split("/").pop() || "script.js";
+      const name = scriptPath.split("/").pop() || "script.js";
       setOutput(`❯ frida -D ${selectedDevice} -n Gadget -l ${name}\n`);
       setConsoleRunning(true);
-      const result = await executeScriptConsole(selectedDevice, scriptCode);
+      const result = await executeScriptConsole(selectedDevice, scriptPath);
       showToast(result, "success");
     } catch (e) {
       setConsoleRunning(false);
@@ -232,7 +224,7 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
           <Button
             size="sm"
             onClick={handleStart}
-            disabled={!selectedDevice || consoleRunning}
+            disabled={!selectedDevice}
             className="h-7 text-xs px-2"
           >
             <Play className="mr-1 h-3 w-3" />
@@ -242,7 +234,7 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
             variant="default"
             size="sm"
             onClick={handleExecute}
-            disabled={!selectedDevice || !scriptCode.trim()}
+            disabled={!selectedDevice || !scriptPath}
             className="h-7 text-xs px-2"
           >
             <Send className="mr-1 h-3 w-3" />
@@ -252,7 +244,7 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
             variant="destructive"
             size="sm"
             onClick={handleStop}
-            disabled={!selectedDevice || !consoleRunning}
+            disabled={!selectedDevice}
             className="h-7 text-xs px-2"
           >
             <Square className="mr-1 h-3 w-3" />
