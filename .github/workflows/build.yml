@@ -155,6 +155,7 @@ jobs:
 
   release:
     name: Release
+    if: github.ref_type == 'tag'
     needs: [build]
     runs-on: ubuntu-latest
     permissions:
