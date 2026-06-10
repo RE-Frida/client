@@ -6,7 +6,7 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   getConfig, discoverDevices, startSession, startFridaConsole,
-  stopFridaConsole, sendFridaInput, launchApp, killApp,
+  stopFridaConsole, sendFridaInput, launchApp,
 } from "@/hooks/tauri";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readTextFile } from "@tauri-apps/plugin-fs";
