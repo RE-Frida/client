@@ -2,6 +2,7 @@ name: Build Client
 
 on:
   push:
+    branches: [main]
     tags: ["v[0-9]*"]
   workflow_dispatch:
 
@@ -10,7 +11,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  version:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bump patch version
+        id: bump
+        run: |
+          CURRENT=$(grep '"version"' src-tauri/tauri.conf.json | head -1 | sed 's/.*"\([0-9.]*\)".*/\1/')
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+          echo "new=${NEW_VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=v${NEW_VERSION}" >> $GITHUB_OUTPUT
+          sed -i "s/\"version\": \"${CURRENT}\"/\"version\": \"${NEW_VERSION}\"/" src-tauri/tauri.conf.json
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src-tauri/tauri.conf.json
+          git commit -m "chore: bump version to ${{ steps.bump.outputs.new }}"
+          git tag ${{ steps.bump.outputs.tag }}
+          git push origin main --tags
+
   build:
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
     name: Build (${{ matrix.os }}, ${{ matrix.profile }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -78,13 +110,11 @@ jobs:
           TRIPLE="${{ matrix.target }}"
           mkdir -p src-tauri/tools
           cd src-tauri/tools
-          # ADB
           curl -sL "https://dl.google.com/android/repository/platform-tools-latest-linux.zip" -o pt.zip
           unzip -qo pt.zip
           cp platform-tools/adb "./adb-${TRIPLE}"
           chmod +x "./adb-${TRIPLE}"
           rm -rf platform-tools pt.zip
-          # frida-inject
           FRIDA_TAG=$(curl -sLI -o /dev/null -w '%{url_effective}' "https://github.com/frida/frida/releases/latest" | xargs basename)
           FRIDA_VER="${FRIDA_TAG#v}"
           echo "Downloading frida-inject v${FRIDA_VER}"
@@ -101,14 +131,12 @@ jobs:
           $triple = "${{ matrix.target }}"
           New-Item -ItemType Directory -Force -Path src-tauri/tools
           cd src-tauri/tools
-          # ADB
           Invoke-WebRequest -Uri "https://dl.google.com/android/repository/platform-tools-latest-windows.zip" -OutFile pt.zip
           Expand-Archive -Path pt.zip -DestinationPath . -Force
           Copy-Item platform-tools/adb.exe "adb-${triple}.exe"
           Copy-Item platform-tools/AdbWinApi.dll ./AdbWinApi.dll -ErrorAction SilentlyContinue
           Copy-Item platform-tools/AdbWinUsbApi.dll ./AdbWinUsbApi.dll -ErrorAction SilentlyContinue
           Remove-Item -Recurse -Force platform-tools, pt.zip
-          # frida-inject
           $apiResp = Invoke-RestMethod -Uri "https://api.github.com/repos/frida/frida/releases/latest"
           $fridaTag = $apiResp.tag_name
           $fridaVer = $fridaTag -replace '^v',''
