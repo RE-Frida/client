@@ -12,15 +12,18 @@ concurrency:
 
 jobs:
   version:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'github-actions[bot]'
+    if: |
+      (github.event_name == 'push' && github.actor != 'github-actions[bot]') ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.bump.outputs.tag }}
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Bump patch version
-        id: bump
+      - id: bump
         run: |
           CURRENT=$(grep '"version"' src-tauri/tauri.conf.json | head -1 | sed 's/.*"\([0-9.]*\)".*/\1/')
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
@@ -30,7 +33,8 @@ jobs:
           echo "tag=v${NEW_VERSION}" >> $GITHUB_OUTPUT
           sed -i "s/\"version\": \"${CURRENT}\"/\"version\": \"${NEW_VERSION}\"/" src-tauri/tauri.conf.json
 
-      - name: Commit and push
+      - name: Commit and push (on main push)
+        if: github.event_name == 'push'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -39,10 +43,18 @@ jobs:
           git tag ${{ steps.bump.outputs.tag }}
           git push origin main --tags
 
+      - name: Push tag only (on dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src-tauri/tauri.conf.json
+          git commit -m "chore: bump version to ${{ steps.bump.outputs.new }}"
+          git tag ${{ steps.bump.outputs.tag }}
+          git push origin ${{ steps.bump.outputs.tag }}
+
   build:
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+    if: startsWith(github.ref, 'refs/tags/v')
     name: Build (${{ matrix.os }}, ${{ matrix.profile }})
     runs-on: ${{ matrix.os }}
     strategy:
