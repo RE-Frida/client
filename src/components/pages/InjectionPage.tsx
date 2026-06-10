@@ -92,10 +92,40 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
     if (unlistenRef.current) {
       unlistenRef.current();
     }
-    const unlisten = await listen<{ line: string; source: string }>("frida-line", (event) => {
+    const unlines: (() => void)[] = [];
+
+    const un1 = await listen<{ line: string; source: string }>("frida-line", (event) => {
       setOutput((prev) => prev + event.payload.line + "\n");
     });
-    unlistenRef.current = unlisten;
+    unlines.push(un1);
+
+    const un2 = await listen<{ success: boolean }>("frida-done", () => {
+      setConsoleRunning(false);
+      setOutput((prev) => prev + "\n[Process exited]\n");
+    });
+    unlines.push(un2);
+
+    unlistenRef.current = () => unlines.forEach((u) => u());
+  };
+
+  const handleExecute = async () => {
+    if (!selectedDevice || !scriptCode.trim()) {
+      showToast("Select a script first", "info");
+      return;
+    }
+    try {
+      await startListening();
+      const name = scriptPath?.split("/").pop() || "script.js";
+      const cmdLine = `❯ frida -D ${selectedDevice} -n Gadget -l ${name}`;
+      setOutput(cmdLine + "\n");
+      setConsoleRunning(true);
+      const result = await executeScriptConsole(selectedDevice, scriptCode);
+      showToast(result, "success");
+    } catch (e) {
+      setConsoleRunning(false);
+      setOutput((prev) => prev + "Error: " + e + "\n");
+      showToast("Execute failed: " + e, "error");
+    }
   };
 
   const handleStart = async () => {

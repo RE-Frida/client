@@ -97,10 +97,7 @@ pub async fn execute_script_console(
             child.wait().await.ok();
         }
     }
-    {
-        let mut stdin_guard = state.frida_stdin.lock().await;
-        *stdin_guard = None;
-    }
+    *state.frida_stdin.lock().await = None;
 
     // Write script to temp file
     let tmp_dir = std::env::temp_dir();
@@ -111,7 +108,6 @@ pub async fn execute_script_console(
     let script_str = script_path.to_str().unwrap_or("");
 
     let mut child = tokio::process::Command::new(&state.frida_path)
-        .arg("-q")
         .arg("-D")
         .arg(&device_id)
         .arg("-n")
@@ -138,7 +134,7 @@ pub async fn execute_script_console(
     *state.frida_stdin.lock().await = Some(stdin);
     *state.frida_child.lock().await = Some(child);
 
-    // Spawn task to clean up temp file when process exits
+    // Stream stdout
     let app_out = app_handle.clone();
     tokio::spawn(async move {
         let mut reader = BufReader::new(stdout).lines();
@@ -150,6 +146,7 @@ pub async fn execute_script_console(
         }
     });
 
+    // Stream stderr
     let app_err = app_handle.clone();
     tokio::spawn(async move {
         let mut reader = BufReader::new(stderr).lines();
@@ -161,7 +158,23 @@ pub async fn execute_script_console(
         }
     });
 
-    // Clean up temp file after short delay
+    // Monitor process exit
+    let child_monitor = state.frida_child.clone();
+    let stdin_monitor = state.frida_stdin.clone();
+    let app_done = app_handle.clone();
+    tokio::spawn(async move {
+        // Wait for process to exit
+        let mut guard = child_monitor.lock().await;
+        if let Some(mut child) = guard.take() {
+            let status = child.wait().await;
+            *stdin_monitor.lock().await = None;
+            let _ = app_done.emit("frida-done", serde_json::json!({
+                "success": status.map(|s| s.success()).unwrap_or(false),
+            }));
+        }
+    });
+
+    // Clean up temp file
     let sp = script_path.clone();
     tokio::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
