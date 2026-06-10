@@ -7,7 +7,7 @@ import { LogsPage } from "@/components/pages/LogsPage";
 import { Marketplace } from "@/components/pages/MarketplacePage";
 import { SettingsPage } from "@/components/pages/SettingsPage";
 import { LoginPage } from "@/components/pages/LoginPage";
-import { getAuthState, isConnected, getConfig, reconnect } from "@/hooks/tauri";
+import { getAuthState, isConnected, getConfig, reconnect, getClientVersionError } from "@/hooks/tauri";
 import { applyTheme } from "@/lib/theme";
 import { subscribeToasts, dismissToast } from "@/lib/toast";
 import type { ToastItem } from "@/lib/toast";
@@ -21,10 +21,12 @@ export default function App() {
   const [reconnecting, setReconnecting] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [clientVersionError, setClientVersionError] = useState<string | null>(null);
 
   const pollAuth = useCallback(() => {
     getAuthState().then(setAuth).catch(() => {});
     isConnected().then(setConnected).catch(() => {});
+    getClientVersionError().then(setClientVersionError).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -68,6 +70,7 @@ export default function App() {
           connected={connected}
           connectionFailed={connectionFailed}
           reconnecting={reconnecting}
+          clientVersionError={clientVersionError}
           onRetry={handleRetry}
           onLoginSuccess={() => {
             getAuthState().then(setAuth).catch(() => {});

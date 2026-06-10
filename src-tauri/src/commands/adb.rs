@@ -53,7 +53,6 @@ pub async fn discover_devices(state: State<'_, AppState>) -> Result<Vec<DeviceIn
 #[tauri::command]
 pub async fn start_session(state: State<'_, AppState>, device_id: String) -> Result<String, String> {
     let port = state.config.lock().unwrap().settings.frida_port;
-    dbg_log!("start_session on device {} port {}", device_id, port);
 
     let output = StdCommand::new(&state.adb_path)
         .arg("-s")
@@ -69,14 +68,11 @@ pub async fn start_session(state: State<'_, AppState>, device_id: String) -> Res
         return Err(format!("Port forward error: {}", stderr));
     }
 
-    state.add_log(format!("Session started on {} (port {})", device_id, port));
     Ok(format!("Connected to {} on port {}", device_id, port))
 }
 
 #[tauri::command]
-pub async fn stop_session(state: State<'_, AppState>) -> Result<String, String> {
-    dbg_log!("stop_session");
-    state.add_log("Session stopped".to_string());
+pub async fn stop_session(_state: State<'_, AppState>) -> Result<String, String> {
     Ok("Session stopped".to_string())
 }
 
@@ -87,8 +83,6 @@ pub async fn execute_script_console(
     device_id: String,
     script_path: String,
 ) -> Result<String, String> {
-    dbg_log!("execute_script_console on device {}", device_id);
-
     // Kill any existing frida process first
     if let Some(pid) = state.frida_pid.lock().unwrap().take() {
         let _ = StdCommand::new("kill").arg("-9").arg(pid.to_string()).output();
@@ -162,8 +156,11 @@ pub async fn execute_script_console(
     let pid_monitor = state.frida_pid.clone();
     let app_done = app_handle.clone();
     tokio::spawn(async move {
-        let mut guard = child_monitor.lock().await;
-        if let Some(mut child) = guard.take() {
+        let child = {
+            let mut guard = child_monitor.lock().await;
+            guard.take()
+        };
+        if let Some(mut child) = child {
             let status = child.wait().await;
             *pid_monitor.lock().unwrap() = None;
             *stdin_monitor.lock().await = None;
@@ -173,7 +170,6 @@ pub async fn execute_script_console(
         }
     });
 
-    state.add_log(format!("Frida console started on {} with script", device_id));
     Ok("Frida console started".to_string())
 }
 
@@ -210,7 +206,6 @@ pub async fn stop_frida_console(
     let mut stdin_guard = state.frida_stdin.lock().await;
     *stdin_guard = None;
 
-    state.add_log("Frida console stopped".to_string());
     Ok("Frida console stopped".to_string())
 }
 
@@ -220,15 +215,12 @@ pub async fn execute_script(
     device_id: String,
     script_code: String,
 ) -> Result<String, String> {
-    dbg_log!("execute_script on device {}", device_id);
-
     let tmp_dir = std::env::temp_dir();
     let script_path = tmp_dir.join("re-frida-script.js");
     std::fs::write(&script_path, &script_code)
         .map_err(|e| format!("Failed to write script: {}", e))?;
 
     let script_str = script_path.to_str().unwrap_or("");
-    state.add_log(format!("Executing script on {} via USB", device_id));
 
     let mut child = tokio::process::Command::new(&state.frida_path)
         .arg("-q")
@@ -290,12 +282,6 @@ pub async fn execute_script(
         full_output.push_str(&stderr_out);
     }
 
-    if status.success() {
-        state.add_log("Script executed successfully".to_string());
-    } else {
-        state.add_log(format!("Script finished with error: {}", stderr_out));
-    }
-
     Ok(full_output)
 }
 
@@ -305,7 +291,6 @@ pub async fn push_gadget(
     device_id: String,
     gadget_path: String,
 ) -> Result<String, String> {
-    dbg_log!("push_gadget to {}", device_id);
     let output = StdCommand::new(&state.adb_path)
         .arg("-s")
         .arg(&device_id)
@@ -316,7 +301,6 @@ pub async fn push_gadget(
         .map_err(|e| format!("Push failed: {}", e))?;
 
     if output.status.success() {
-        state.add_log(format!("Gadget pushed to {}", device_id));
         Ok("Gadget pushed successfully".to_string())
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -329,7 +313,6 @@ pub async fn list_packages(
     state: State<'_, AppState>,
     device_id: String,
 ) -> Result<Vec<String>, String> {
-    dbg_log!("list_packages for {}", device_id);
     let output = StdCommand::new(&state.adb_path)
         .arg("-s")
         .arg(&device_id)
@@ -359,7 +342,6 @@ pub async fn launch_app(
     device_id: String,
     package_id: String,
 ) -> Result<String, String> {
-    dbg_log!("launch_app {} on {}", package_id, device_id);
     let output = StdCommand::new(&state.adb_path)
         .arg("-s")
         .arg(&device_id)
@@ -374,7 +356,6 @@ pub async fn launch_app(
         .map_err(|e| format!("Failed to launch: {}", e))?;
 
     if output.status.success() {
-        state.add_log(format!("Launched {}", package_id));
         Ok(format!("Launched {}", package_id))
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -388,7 +369,6 @@ pub async fn kill_app(
     device_id: String,
     package_id: String,
 ) -> Result<String, String> {
-    dbg_log!("kill_app {} on {}", package_id, device_id);
     let output = StdCommand::new(&state.adb_path)
         .arg("-s")
         .arg(&device_id)
@@ -400,7 +380,6 @@ pub async fn kill_app(
         .map_err(|e| format!("Failed to kill: {}", e))?;
 
     if output.status.success() {
-        state.add_log(format!("Killed {}", package_id));
         Ok(format!("Killed {}", package_id))
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);

@@ -31,6 +31,7 @@ async fn reconnect(state: tauri::State<'_, AppState>) -> Result<(), String> {
     let mut ws_guard = state.ws.write().await;
     *ws_guard = None;
     *state.connected.lock().unwrap() = false;
+    *state.client_outdated.lock().unwrap() = None;
     drop(ws_guard);
 
     let state_clone = state.inner().clone();
@@ -39,6 +40,11 @@ async fn reconnect(state: tauri::State<'_, AppState>) -> Result<(), String> {
     });
 
     Ok(())
+}
+
+#[tauri::command]
+async fn get_client_version_error(state: tauri::State<'_, AppState>) -> Result<Option<String>, String> {
+    Ok(state.client_outdated.lock().unwrap().clone())
 }
 
 // ─── App Info ───────────────────────────────────────────────────
@@ -150,6 +156,7 @@ pub fn run() {
             commands::projects::update_project_file,
             is_connected,
             reconnect,
+            get_client_version_error,
             open_folder,
             get_app_version,
             is_debug_build,

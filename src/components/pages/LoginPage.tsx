@@ -8,11 +8,12 @@ interface LoginPageProps {
   connected: boolean;
   connectionFailed: boolean;
   reconnecting: boolean;
+  clientVersionError?: string | null;
   onRetry: () => void;
   onLoginSuccess: () => void;
 }
 
-export function LoginPage({ connected, connectionFailed, reconnecting, onRetry, onLoginSuccess }: LoginPageProps) {
+export function LoginPage({ connected, connectionFailed, reconnecting, clientVersionError, onRetry, onLoginSuccess }: LoginPageProps) {
   const [loggingIn, setLoggingIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,8 +50,17 @@ export function LoginPage({ connected, connectionFailed, reconnecting, onRetry, 
           <div className="flex flex-col items-center gap-4">
             <AlertCircle className="h-8 w-8 text-destructive" />
             <div className="text-center">
-              <p className="text-sm font-medium text-destructive">Failed to connect to server</p>
-              <p className="text-xs text-muted-foreground mt-1">Make sure the server is running and accessible</p>
+              {clientVersionError ? (
+                <>
+                  <p className="text-sm font-medium text-destructive">Client update required</p>
+                  <p className="text-xs text-muted-foreground mt-1">{clientVersionError}</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-medium text-destructive">Failed to connect to server</p>
+                  <p className="text-xs text-muted-foreground mt-1">Make sure the server is running and accessible</p>
+                </>
+              )}
             </div>
             <Button onClick={onRetry} disabled={reconnecting} size="lg" className="gap-2">
               {reconnecting ? (

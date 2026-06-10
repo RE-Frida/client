@@ -99,6 +99,7 @@ pub struct AppState {
     pub frida_stdin: Arc<AsyncMutex<Option<ChildStdin>>>,
     pub frida_child: Arc<AsyncMutex<Option<Child>>>,
     pub frida_pid: Arc<Mutex<Option<u32>>>,
+    pub client_outdated: Arc<Mutex<Option<String>>>,
 }
 
 impl AppState {
@@ -128,6 +129,7 @@ impl AppState {
             frida_stdin: Arc::new(AsyncMutex::new(None)),
             frida_child: Arc::new(AsyncMutex::new(None)),
             frida_pid: Arc::new(Mutex::new(None)),
+            client_outdated: Arc::new(Mutex::new(None)),
         }
     }
 

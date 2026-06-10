@@ -127,6 +127,10 @@ export async function reconnect(): Promise<void> {
   return invoke("reconnect");
 }
 
+export async function getClientVersionError(): Promise<string | null> {
+  return invoke("get_client_version_error");
+}
+
 // ─── App ─────────────────────────────────────────────────────────
 
 export async function getAppVersion(): Promise<string> {

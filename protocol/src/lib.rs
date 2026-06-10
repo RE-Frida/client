@@ -216,6 +216,8 @@ pub struct DiscordConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerInfo {
     pub version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub minimum_client_version: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

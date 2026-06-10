@@ -12,6 +12,9 @@ const EMBEDDED_CERT: &[u8] = include_bytes!("../embedded_cert.pem");
 
 /// Connect to the server with TLS and SPKI pinning
 pub async fn connect_ws(state: AppState) {
+    // Clear any previous client version error
+    *state.client_outdated.lock().unwrap() = None;
+
     let url = SERVER_URL;
     let pending: PendingRequests = Arc::new(Mutex::new(std::collections::HashMap::new()));
     let connected = state.connected.clone();
@@ -153,24 +156,44 @@ pub async fn connect_ws(state: AppState) {
     };
     *state.ws.write().await = Some(client);
 
-    // Report client version to server
+    // Report client version to server and check for version rejection
     let version = env!("CARGO_PKG_VERSION").to_string();
-    let version_tx = tx.clone();
-    tokio::spawn(async move {
-        let msg = WsMessage::Request(Request {
-            id: uuid::Uuid::new_v4().to_string(),
-            action: Action::ClientInfo,
-            data: Some(serde_json::json!({
-                "version": version,
-                "platform": std::env::consts::OS,
-                "arch": std::env::consts::ARCH,
-            })),
-            token: None,
-        });
-        if let Ok(json) = serde_json::to_string(&msg) {
-            let _ = version_tx.send(json).await;
-        }
+    let ci_id = uuid::Uuid::new_v4().to_string();
+    let (ci_tx, mut ci_rx) = tokio::sync::oneshot::channel::<Response>();
+    pending.lock().unwrap().insert(ci_id.clone(), ci_tx);
+
+    let ci_msg = WsMessage::Request(Request {
+        id: ci_id,
+        action: Action::ClientInfo,
+        data: Some(serde_json::json!({
+            "version": version,
+            "platform": std::env::consts::OS,
+            "arch": std::env::consts::ARCH,
+        })),
+        token: None,
     });
+    if let Ok(json) = serde_json::to_string(&ci_msg) {
+        let _ = tx.send(json).await;
+    }
+
+    // Wait for ClientInfo response with timeout
+    match tokio::time::timeout(std::time::Duration::from_secs(5), &mut ci_rx).await {
+        Ok(Ok(resp)) => {
+            if !resp.ok {
+                let error = resp.error.unwrap_or_else(|| "Update required".to_string());
+                dbg_log!("Server rejected client version: {}", error);
+                *state.client_outdated.lock().unwrap() = Some(error);
+                *connected.lock().unwrap() = false;
+                return;
+            }
+        }
+        Ok(Err(_)) => {
+            dbg_log!("ClientInfo response channel closed");
+        }
+        Err(_) => {
+            dbg_log!("ClientInfo response timed out");
+        }
+    }
 
     // Try to restore auth from saved token
     let saved_token = state.auth.lock().unwrap().token.clone();
