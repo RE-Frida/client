@@ -77,7 +77,6 @@ export default function App() {
     </div>
   );
 }
-  }
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
@@ -142,3 +141,4 @@ function ToastContainer({ toasts }: { toasts: ToastItem[] }) {
       ))}
     </div>
   );
+}
