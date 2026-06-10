@@ -5,8 +5,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  getConfig, discoverDevices, startSession, startFridaConsole,
-  stopFridaConsole, sendFridaInput, launchApp,
+  getConfig, discoverDevices, startSession, executeScriptConsole,
+  stopFridaConsole, sendFridaInput, launchApp, killApp,
 } from "@/hooks/tauri";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readTextFile } from "@tauri-apps/plugin-fs";
@@ -104,20 +104,31 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
       showToast("Starting session...", "info");
       const result = await startSession(selectedDevice);
       showToast(result, "success");
-
       if (pkg) {
         const launch = await launchApp(selectedDevice, pkg);
         showToast(launch, "success");
       }
-
-      await startListening();
-      const consoleResult = await startFridaConsole(selectedDevice);
-      setConsoleRunning(true);
-      setOutput("");
-
-      showToast(consoleResult, "success");
     } catch (e) {
-      showToast("Error: " + e, "error");
+      showToast("Start failed: " + e, "error");
+    }
+  };
+
+  const handleExecute = async () => {
+    if (!selectedDevice || !scriptCode.trim()) {
+      showToast("Select a script first", "info");
+      return;
+    }
+    try {
+      await startListening();
+      const name = scriptPath?.split("/").pop() || "script.js";
+      setOutput("> Executing: " + name + "\n");
+      setConsoleRunning(true);
+      const result = await executeScriptConsole(selectedDevice, scriptCode);
+      showToast(result, "success");
+    } catch (e) {
+      setConsoleRunning(false);
+      setOutput((prev) => prev + "Error: " + e + "\n");
+      showToast("Execute failed: " + e, "error");
     }
   };
 
@@ -127,36 +138,23 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
       const result = await stopFridaConsole();
       setConsoleRunning(false);
       showToast(result, "info");
+      if (pkg) {
+        await killApp(selectedDevice, pkg);
+      }
     } catch (e) {
-      showToast("Error: " + e, "error");
-    }
-  };
-
-  const handleExecute = async () => {
-    if (!scriptCode.trim()) {
-      showToast("Select a script first", "info");
-      return;
-    }
-    const code = scriptCode;
-    setOutput((prev) => prev + "> Executing script: " + (scriptPath?.split("/").pop() || "script.js") + "\n");
-    setInput("");
-    try {
-      await sendFridaInput(code);
-    } catch (e) {
-      setOutput((prev) => prev + "Error: " + e + "\n");
-      showToast("Execute failed", "error");
+      showToast("Stop failed: " + e, "error");
     }
   };
 
   const handleSendInput = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== "Enter" || !input.trim()) return;
+    if (e.key !== "Enter" || !input.trim() || !consoleRunning) return;
     const line = input;
     setInput("");
     setOutput((prev) => prev + "> " + line + "\n");
     try {
       await sendFridaInput(line);
     } catch (e) {
-      setOutput((prev) => prev + "Error sending input: " + e + "\n");
+      setOutput((prev) => prev + "Error: " + e + "\n");
     }
   };
 
@@ -203,16 +201,6 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
 
         <div className="flex items-center gap-1.5 shrink-0">
           <Button
-            variant="default"
-            size="sm"
-            onClick={handleExecute}
-            disabled={!scriptCode.trim() || !consoleRunning}
-            className="h-7 text-xs px-2"
-          >
-            <Send className="mr-1 h-3 w-3" />
-            Execute
-          </Button>
-          <Button
             size="sm"
             onClick={handleStart}
             disabled={!selectedDevice || consoleRunning}
@@ -220,6 +208,16 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
           >
             <Play className="mr-1 h-3 w-3" />
             Start
+          </Button>
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleExecute}
+            disabled={!selectedDevice || !scriptCode.trim()}
+            className="h-7 text-xs px-2"
+          >
+            <Send className="mr-1 h-3 w-3" />
+            Execute
           </Button>
           <Button
             variant="destructive"
@@ -254,7 +252,7 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
           >
             {output || (
               <span className="text-muted-foreground italic">
-                {consoleRunning ? "Waiting for output..." : "Click Start to launch the Frida console"}
+                Click Start (port forward + launch app), then Execute to run a script
               </span>
             )}
           </div>
@@ -266,7 +264,7 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleSendInput}
-              placeholder={consoleRunning ? "Type JavaScript here and press Enter..." : "Start the console first..."}
+              placeholder={consoleRunning ? "Type JavaScript here and press Enter..." : "Execute a script first..."}
               disabled={!consoleRunning}
               className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs font-mono outline-none focus:ring-1 focus:ring-primary disabled:opacity-40"
             />

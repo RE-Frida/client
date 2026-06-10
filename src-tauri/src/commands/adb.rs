@@ -81,18 +81,20 @@ pub async fn stop_session(state: State<'_, AppState>) -> Result<String, String> 
 }
 
 #[tauri::command]
-pub async fn start_frida_console(
+pub async fn execute_script_console(
     app_handle: tauri::AppHandle,
     state: State<'_, AppState>,
     device_id: String,
+    script_code: String,
 ) -> Result<String, String> {
-    dbg_log!("start_frida_console on device {}", device_id);
+    dbg_log!("execute_script_console on device {}", device_id);
 
     // Kill any existing frida process first
     {
         let mut child_guard = state.frida_child.lock().await;
         if let Some(mut child) = child_guard.take() {
             let _ = child.kill().await;
+            child.wait().await.ok();
         }
     }
     {
@@ -100,17 +102,28 @@ pub async fn start_frida_console(
         *stdin_guard = None;
     }
 
+    // Write script to temp file
+    let tmp_dir = std::env::temp_dir();
+    let script_path = tmp_dir.join("re-frida-script.js");
+    std::fs::write(&script_path, &script_code)
+        .map_err(|e| format!("Failed to write script: {}", e))?;
+
+    let script_str = script_path.to_str().unwrap_or("");
+
     let mut child = tokio::process::Command::new(&state.frida_path)
         .arg("-q")
         .arg("-D")
         .arg(&device_id)
         .arg("-n")
         .arg("Gadget")
+        .arg("-l")
+        .arg(script_str)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| {
+            let _ = std::fs::remove_file(&script_path);
             if e.to_string().contains("No such file") || e.to_string().contains("not found") {
                 "Frida not found.\n\nInstall: pip install frida".to_string()
             } else {
@@ -125,6 +138,7 @@ pub async fn start_frida_console(
     *state.frida_stdin.lock().await = Some(stdin);
     *state.frida_child.lock().await = Some(child);
 
+    // Spawn task to clean up temp file when process exits
     let app_out = app_handle.clone();
     tokio::spawn(async move {
         let mut reader = BufReader::new(stdout).lines();
@@ -147,7 +161,14 @@ pub async fn start_frida_console(
         }
     });
 
-    state.add_log(format!("Frida console started on {}", device_id));
+    // Clean up temp file after short delay
+    let sp = script_path.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        let _ = std::fs::remove_file(&sp);
+    });
+
+    state.add_log(format!("Frida console started on {} with script", device_id));
     Ok("Frida console started".to_string())
 }
 

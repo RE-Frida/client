@@ -36,8 +36,8 @@ export async function listPackages(deviceId: string): Promise<string[]> {
   return invoke("list_packages", { deviceId });
 }
 
-export async function startFridaConsole(deviceId: string): Promise<string> {
-  return invoke("start_frida_console", { deviceId });
+export async function executeScriptConsole(deviceId: string, scriptCode: string): Promise<string> {
+  return invoke("execute_script_console", { deviceId, scriptCode });
 }
 
 export async function sendFridaInput(input: string): Promise<void> {

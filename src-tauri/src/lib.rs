@@ -123,7 +123,7 @@ pub fn run() {
             commands::adb::start_session,
             commands::adb::stop_session,
             commands::adb::execute_script,
-            commands::adb::start_frida_console,
+            commands::adb::execute_script_console,
             commands::adb::send_frida_input,
             commands::adb::stop_frida_console,
             commands::adb::push_gadget,
