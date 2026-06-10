@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Search, Download, User, Plus, Trash2, Package,
-  X, Tag, FileCode, Loader2, CheckCircle2, ChevronDown,
+  X, Tag, FileCode, Loader2, CheckCircle2, ChevronDown, AlertTriangle,
   Image, AlertCircle, ArrowLeft, FolderOpen, Upload, RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,8 @@ export function Marketplace() {
   const [installed, setInstalled] = useState<Set<string>>(new Set());
   const [showInstalled, setShowInstalled] = useState(false);
   const [diffMap, setDiffMap] = useState<Map<string, boolean>>(new Map());
+  const [downloadTarget, setDownloadTarget] = useState<ProjectData | null>(null);
+  const [showDownloadWarning, setShowDownloadWarning] = useState(false);
 
   // Detail page state
   const [viewProject, setViewProject] = useState<ProjectData | null>(null);
@@ -152,15 +154,23 @@ export function Marketplace() {
   };
 
   const handleDownload = async (project: ProjectData) => {
-    setDownloading(project.id);
+    setDownloadTarget(project);
+    setShowDownloadWarning(true);
+  };
+
+  const confirmDownload = async () => {
+    if (!downloadTarget) return;
+    setShowDownloadWarning(false);
+    setDownloading(downloadTarget.id);
     try {
-      await downloadProject(project.id);
-      setInstalled((prev) => new Set(prev).add(project.id));
-      setDiffMap((prev) => new Map(prev).set(project.id, false));
+      await downloadProject(downloadTarget.id);
+      setInstalled((prev) => new Set(prev).add(downloadTarget!.id));
+      setDiffMap((prev) => new Map(prev).set(downloadTarget!.id, false));
     } catch (e) {
       console.error("Failed to download project:", e);
     } finally {
       setDownloading(null);
+      setDownloadTarget(null);
     }
   };
 
@@ -731,6 +741,46 @@ export function Marketplace() {
                 >
                   {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Create
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Download Warning */}
+      {showDownloadWarning && downloadTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="w-full max-w-md mx-4 border-orange-500/50">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="h-6 w-6 text-orange-500 shrink-0" />
+                <div>
+                  <CardTitle className="text-lg text-orange-500">Security Warning</CardTitle>
+                  <CardDescription>
+                    You are about to download "{downloadTarget.name}" by {downloadTarget.author}
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="rounded-lg border border-orange-500/30 bg-orange-500/10 p-3 text-sm text-orange-400">
+                <p className="font-medium mb-1">Anyone can upload scripts to RE:Frida</p>
+                <p className="text-xs text-muted-foreground">
+                  Scripts can execute arbitrary code on your device. Only download from authors you trust.
+                  Review the code before running it. The RE:Frida team does not review or endorse
+                  third-party uploads.
+                </p>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => { setShowDownloadWarning(false); setDownloadTarget(null); }}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={confirmDownload}
+                  className="bg-orange-600 hover:bg-orange-700 text-white border-none"
+                >
+                  I understand, download anyway
                 </Button>
               </div>
             </CardContent>

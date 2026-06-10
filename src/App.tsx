@@ -3,6 +3,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { TitleBar } from "@/components/layout/TitleBar";
 import { Dashboard } from "@/components/pages/Dashboard";
 import { InjectionPage } from "@/components/pages/InjectionPage";
+import { AdbPage } from "@/components/pages/AdbPage";
 import { LogsPage } from "@/components/pages/LogsPage";
 import { Marketplace } from "@/components/pages/MarketplacePage";
 import { SettingsPage } from "@/components/pages/SettingsPage";
@@ -65,26 +66,30 @@ export default function App() {
   if (!connected || !auth?.authenticated) {
     return (
       <div className="flex h-screen flex-col">
-        <TitleBar />
-        <LoginPage
-          connected={connected}
-          connectionFailed={connectionFailed}
-          reconnecting={reconnecting}
-          clientVersionError={clientVersionError}
-          onRetry={handleRetry}
-          onLoginSuccess={() => {
-            getAuthState().then(setAuth).catch(() => {});
-          }}
-        />
+        <div className="bg-waves"><div className="orb" /><div className="orb" /><div className="orb" /></div>
+        <div className="relative z-10">
+          <TitleBar />
+          <LoginPage
+            connected={connected}
+            connectionFailed={connectionFailed}
+            reconnecting={reconnecting}
+            clientVersionError={clientVersionError}
+            onRetry={handleRetry}
+            onLoginSuccess={() => {
+              getAuthState().then(setAuth).catch(() => {});
+            }}
+          />
+        </div>
         <ToastContainer toasts={toasts} />
-    </div>
-  );
-}
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
+      <div className="bg-waves"><div className="orb" /><div className="orb" /><div className="orb" /></div>
       <TitleBar />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative z-10">
         <Sidebar
           activeTab={activeTab}
           onTabChange={setActiveTab}
@@ -94,22 +99,28 @@ export default function App() {
           }}
         />
         <main className="flex-1 overflow-auto">
-          <div className={"h-full" + (activeTab === "dashboard" ? "" : " hidden")}>
+          <div className={"h-full page-enter" + (activeTab === "dashboard" ? "" : " hidden")}>
             <Dashboard />
           </div>
-          <div className={"h-full" + (activeTab === "injection" ? "" : " hidden")}>
+          <div className={"h-full page-enter" + (activeTab === "injection" ? "" : " hidden")}>
             <InjectionPage
               selectedDevice={selectedDevice}
               onDeviceChange={setSelectedDevice}
             />
           </div>
-          <div className={"h-full" + (activeTab === "logs" ? "" : " hidden")}>
-            <LogsPage />
-          </div>
-          <div className={"h-full" + (activeTab === "marketplace" ? "" : " hidden")}>
+          <div className={"h-full page-enter" + (activeTab === "marketplace" ? "" : " hidden")}>
             <Marketplace />
           </div>
-          <div className={"h-full" + (activeTab === "settings" ? "" : " hidden")}>
+          <div className={"h-full page-enter" + (activeTab === "adb" ? "" : " hidden")}>
+            <AdbPage
+              selectedDevice={selectedDevice}
+              onDeviceChange={setSelectedDevice}
+            />
+          </div>
+          <div className={"h-full page-enter" + (activeTab === "logs" ? "" : " hidden")}>
+            <LogsPage />
+          </div>
+          <div className={"h-full page-enter" + (activeTab === "settings" ? "" : " hidden")}>
             <SettingsPage />
           </div>
         </main>
@@ -134,7 +145,9 @@ function ToastContainer({ toasts }: { toasts: ToastItem[] }) {
               ? "border-green-500 text-green-400"
               : t.type === "error"
                 ? "border-red-500 text-red-400"
-                : "border-primary text-primary")
+                : t.type === "warning"
+                  ? "border-orange-500 text-orange-400"
+                  : "border-primary text-primary")
           }
         >
           <div className="flex items-center gap-2">

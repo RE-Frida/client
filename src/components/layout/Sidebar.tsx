@@ -9,6 +9,7 @@ import {
   User,
   PanelLeftOpen,
   PanelLeftClose,
+  Terminal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { logout } from "@/hooks/tauri";
@@ -24,6 +25,7 @@ interface SidebarProps {
 const navItems: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "injection", label: "Injection", icon: Send },
+  { id: "adb", label: "ADB", icon: Terminal },
   { id: "marketplace", label: "Marketplace", icon: Store },
   { id: "logs", label: "Logs", icon: ScrollText },
   { id: "settings", label: "Settings", icon: Settings },
@@ -59,7 +61,7 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "group relative flex h-full flex-col border-r border-sidebar-border bg-sidebar transition-all duration-200",
+        "group relative z-20 flex h-full flex-col border-r border-sidebar-border bg-sidebar transition-all duration-200",
         collapsed ? "w-14" : "w-48"
       )}
     >

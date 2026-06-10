@@ -270,7 +270,7 @@ pub async fn execute_script(
     let stdout_out = stdout_result.unwrap_or_default();
     let stderr_out = stderr_result.unwrap_or_default();
 
-    let status = child.wait().await.map_err(|e| e.to_string())?;
+    let _status = child.wait().await.map_err(|e| e.to_string())?;
 
     let _ = std::fs::remove_file(&script_path);
 
@@ -385,4 +385,175 @@ pub async fn kill_app(
         let stderr = String::from_utf8_lossy(&output.stderr);
         Err(format!("Kill error: {}", stderr))
     }
+}
+
+#[tauri::command]
+pub async fn adb_shell(
+    state: State<'_, AppState>,
+    device_id: String,
+    command: String,
+) -> Result<String, String> {
+    let output = StdCommand::new(&state.adb_path)
+        .arg("-s")
+        .arg(&device_id)
+        .arg("shell")
+        .arg(&command)
+        .output()
+        .map_err(|e| format!("ADB shell failed: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let mut result = stdout;
+    if !stderr.is_empty() {
+        if !result.is_empty() { result.push('\n'); }
+        result.push_str(&stderr);
+    }
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn adb_screenshot(
+    state: State<'_, AppState>,
+    device_id: String,
+) -> Result<Vec<u8>, String> {
+    // Take screenshot on device
+    let output = StdCommand::new(&state.adb_path)
+        .arg("-s")
+        .arg(&device_id)
+        .arg("shell")
+        .arg("screencap")
+        .arg("-p")
+        .arg("/sdcard/re-frida-ss.png")
+        .output()
+        .map_err(|e| format!("screencap failed: {}", e))?;
+    if !output.status.success() {
+        return Err("screencap command failed".to_string());
+    }
+
+    // Pull the file
+    let output = StdCommand::new(&state.adb_path)
+        .arg("-s")
+        .arg(&device_id)
+        .arg("pull")
+        .arg("/sdcard/re-frida-ss.png")
+        .arg("-")  // output to stdout
+        .output()
+        .map_err(|e| format!("pull failed: {}", e))?;
+
+    if output.status.success() {
+        Ok(output.stdout)
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).to_string())
+    }
+}
+
+#[tauri::command]
+pub async fn adb_logcat(
+    state: State<'_, AppState>,
+    device_id: String,
+    filter: String,
+    lines: u32,
+) -> Result<String, String> {
+    let mut cmd = StdCommand::new(&state.adb_path);
+    cmd.arg("-s").arg(&device_id).arg("logcat");
+    if !filter.is_empty() {
+        cmd.arg("-s").arg(&filter);
+    }
+    if lines > 0 {
+        cmd.arg("-t").arg(lines.to_string());
+    }
+    let output = cmd.output().map_err(|e| format!("logcat failed: {}", e))?;
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    Ok(stdout)
+}
+
+#[tauri::command]
+pub async fn adb_reboot(
+    state: State<'_, AppState>,
+    device_id: String,
+    mode: String,
+) -> Result<String, String> {
+    let mut cmd = StdCommand::new(&state.adb_path);
+    cmd.arg("-s").arg(&device_id);
+    match mode.as_str() {
+        "recovery" => { cmd.arg("reboot").arg("recovery"); }
+        "bootloader" => { cmd.arg("reboot").arg("bootloader"); }
+        "soft" => { cmd.arg("reboot"); }
+        _ => { cmd.arg("reboot"); }
+    }
+    let output = cmd.output().map_err(|e| format!("reboot failed: {}", e))?;
+    if output.status.success() {
+        Ok(format!("Rebooting to {}...", mode))
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).to_string())
+    }
+}
+
+#[tauri::command]
+pub async fn adb_install(
+    state: State<'_, AppState>,
+    device_id: String,
+    apk_path: String,
+) -> Result<String, String> {
+    let output = StdCommand::new(&state.adb_path)
+        .arg("-s")
+        .arg(&device_id)
+        .arg("install")
+        .arg("-r")
+        .arg(&apk_path)
+        .output()
+        .map_err(|e| format!("install failed: {}", e))?;
+
+    if output.status.success() {
+        Ok("Installed successfully".to_string())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).to_string())
+    }
+}
+
+#[tauri::command]
+pub async fn adb_uninstall(
+    state: State<'_, AppState>,
+    device_id: String,
+    package_id: String,
+) -> Result<String, String> {
+    let output = StdCommand::new(&state.adb_path)
+        .arg("-s")
+        .arg(&device_id)
+        .arg("uninstall")
+        .arg(&package_id)
+        .output()
+        .map_err(|e| format!("uninstall failed: {}", e))?;
+
+    if output.status.success() {
+        Ok("Uninstalled successfully".to_string())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).to_string())
+    }
+}
+
+#[tauri::command]
+pub async fn adb_list_files(
+    state: State<'_, AppState>,
+    device_id: String,
+    path: String,
+) -> Result<String, String> {
+    let output = StdCommand::new(&state.adb_path)
+        .arg("-s")
+        .arg(&device_id)
+        .arg("shell")
+        .arg("ls")
+        .arg("-la")
+        .arg(&path)
+        .output()
+        .map_err(|e| format!("list files failed: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let mut result = stdout;
+    if !stderr.is_empty() {
+        if !result.is_empty() { result.push('\n'); }
+        result.push_str(&stderr);
+    }
+    Ok(result)
 }

@@ -397,6 +397,36 @@ export async function updateProjectFile(
   return invoke("update_project_file", { projectId, path, content });
 }
 
+// ─── ADB Tools ───────────────────────────────────────────────────
+
+export async function adbShell(deviceId: string, command: string): Promise<string> {
+  return invoke("adb_shell", { deviceId, command });
+}
+
+export async function adbScreenshot(deviceId: string): Promise<number[]> {
+  return invoke("adb_screenshot", { deviceId });
+}
+
+export async function adbLogcat(deviceId: string, filter: string, lines: number): Promise<string> {
+  return invoke("adb_logcat", { deviceId, filter, lines });
+}
+
+export async function adbReboot(deviceId: string, mode: string): Promise<string> {
+  return invoke("adb_reboot", { deviceId, mode });
+}
+
+export async function adbInstall(deviceId: string, apkPath: string): Promise<string> {
+  return invoke("adb_install", { deviceId, apkPath });
+}
+
+export async function adbUninstall(deviceId: string, packageId: string): Promise<string> {
+  return invoke("adb_uninstall", { deviceId, packageId });
+}
+
+export async function adbListFiles(deviceId: string, path: string): Promise<string> {
+  return invoke("adb_list_files", { deviceId, path });
+}
+
 // ─── File System ─────────────────────────────────────────────────
 
 export async function openFolder(path: string): Promise<void> {

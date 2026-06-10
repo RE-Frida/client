@@ -59,4 +59,4 @@ export interface AuthState {
   token: string | null;
 }
 
-export type TabId = "dashboard" | "injection" | "marketplace" | "logs" | "settings";
+export type TabId = "dashboard" | "injection" | "adb" | "marketplace" | "logs" | "settings";

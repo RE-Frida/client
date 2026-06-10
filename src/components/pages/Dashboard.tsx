@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { User, Wifi, WifiOff } from "lucide-react";
 import { getAuthState, isConnected } from "@/hooks/tauri";
-import { FridaLogo } from "@/components/ui/FridaLogo";
 import type { AuthState } from "@/types";
 
 export function Dashboard() {
@@ -22,10 +21,11 @@ export function Dashboard() {
   return (
     <div className="flex h-full items-center justify-center p-8">
       <div className="flex w-full max-w-lg flex-col items-center gap-10">
-        {/* Logo + Title */}
-        <div className="flex flex-col items-center gap-3">
-          <FridaLogo className="h-12 w-12 text-primary" />
-          <h1 className="text-2xl font-bold tracking-tight">RE:Frida</h1>
+        {/* Title */}
+        <div className="flex flex-col items-center gap-2">
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
+            RE:Frida
+          </h1>
           <p className="text-sm text-muted-foreground">
             Android reverse-engineering toolkit
           </p>
@@ -39,7 +39,7 @@ export function Dashboard() {
                 <img
                   src={auth.avatar_url}
                   alt="avatar"
-                  className="h-full w-full rounded-full object-cover ring-2 ring-primary/20"
+                  className="h-full w-full rounded-full object-cover"
                   onError={(e) => {
                     (e.target as HTMLImageElement).classList.add("hidden");
                     (e.target as HTMLImageElement).parentElement!.querySelector(".fallback")?.classList.remove("hidden");
@@ -48,7 +48,7 @@ export function Dashboard() {
               ) : null}
               <div
                 className={
-                  "fallback flex h-full w-full items-center justify-center rounded-full bg-muted ring-2 ring-primary/20" +
+                  "fallback flex h-full w-full items-center justify-center rounded-full bg-muted" +
                   (auth?.authenticated && auth?.avatar_url ? " hidden" : "")
                 }
               >
@@ -56,8 +56,7 @@ export function Dashboard() {
               </div>
               {auth?.authenticated && (
                 <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3">
-                  <span className="absolute inset-0 rounded-full bg-green-500 ring-2 ring-card" />
-                  <span className="absolute inset-0 rounded-full animate-pulse-ring" />
+                  <span className="absolute inset-0 rounded-full bg-green-500" />
                 </div>
               )}
             </div>

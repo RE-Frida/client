@@ -58,7 +58,7 @@ export function LoginPage({ connected, connectionFailed, reconnecting, clientVer
               ) : (
                 <>
                   <p className="text-sm font-medium text-destructive">Failed to connect to server</p>
-                  <p className="text-xs text-muted-foreground mt-1">Make sure the server is running and accessible</p>
+                  <p className="text-xs text-muted-foreground mt-1">Please check your internet connection and try again</p>
                 </>
               )}
             </div>

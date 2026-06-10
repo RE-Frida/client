@@ -1,4 +1,4 @@
-type ToastType = "success" | "error" | "info";
+type ToastType = "success" | "error" | "info" | "warning";
 
 interface ToastItem {
   id: string;
