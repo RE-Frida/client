@@ -108,6 +108,8 @@ pub async fn execute_script_console(
     let script_str = script_path.to_str().unwrap_or("");
 
     let mut child = tokio::process::Command::new(&state.frida_path)
+        .env("PYTHONUNBUFFERED", "1")
+        .env("TERM", "dumb")
         .arg("-D")
         .arg(&device_id)
         .arg("-n")

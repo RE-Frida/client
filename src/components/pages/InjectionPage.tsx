@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Smartphone, RefreshCw, ChevronDown, Play, Square, Terminal,
   FileCode2, Send,
@@ -26,16 +26,14 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
   const [scriptPath, setScriptPath] = useState<string | null>(null);
   const [scriptCode, setScriptCode] = useState("");
   const [output, setOutput] = useState("");
+  const [inputBuffer, setInputBuffer] = useState("");
   const [consoleRunning, setConsoleRunning] = useState(false);
-  const [input, setInput] = useState("");
   const outputRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const unlistenRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     getConfig().then((c) => { setConfig(c); }).catch(() => {});
     refreshDevices();
-
     return () => {
       if (unlistenRef.current) {
         unlistenRef.current();
@@ -47,13 +45,7 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
     if (outputRef.current) {
       outputRef.current.scrollTop = outputRef.current.scrollHeight;
     }
-  }, [output]);
-
-  useEffect(() => {
-    if (consoleRunning && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [consoleRunning]);
+  }, [output, inputBuffer]);
 
   const refreshDevices = async () => {
     setRefreshing(true);
@@ -88,7 +80,7 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
     }
   };
 
-  const startListening = async () => {
+  const startListening = useCallback(async () => {
     if (unlistenRef.current) {
       unlistenRef.current();
     }
@@ -101,12 +93,13 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
 
     const un2 = await listen<{ success: boolean }>("frida-done", () => {
       setConsoleRunning(false);
+      setInputBuffer("");
       setOutput((prev) => prev + "\n[Process exited]\n");
     });
     unlines.push(un2);
 
     unlistenRef.current = () => unlines.forEach((u) => u());
-  };
+  }, []);
 
   const handleExecute = async () => {
     if (!selectedDevice || !scriptCode.trim()) {
@@ -116,8 +109,7 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
     try {
       await startListening();
       const name = scriptPath?.split("/").pop() || "script.js";
-      const cmdLine = `❯ frida -D ${selectedDevice} -n Gadget -l ${name}`;
-      setOutput(cmdLine + "\n");
+      setOutput(`❯ frida -D ${selectedDevice} -n Gadget -l ${name}\n`);
       setConsoleRunning(true);
       const result = await executeScriptConsole(selectedDevice, scriptCode);
       showToast(result, "success");
@@ -143,30 +135,12 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
     }
   };
 
-  const handleExecute = async () => {
-    if (!selectedDevice || !scriptCode.trim()) {
-      showToast("Select a script first", "info");
-      return;
-    }
-    try {
-      await startListening();
-      const name = scriptPath?.split("/").pop() || "script.js";
-      setOutput("> Executing: " + name + "\n");
-      setConsoleRunning(true);
-      const result = await executeScriptConsole(selectedDevice, scriptCode);
-      showToast(result, "success");
-    } catch (e) {
-      setConsoleRunning(false);
-      setOutput((prev) => prev + "Error: " + e + "\n");
-      showToast("Execute failed: " + e, "error");
-    }
-  };
-
   const handleStop = async () => {
     if (!selectedDevice) return;
     try {
       const result = await stopFridaConsole();
       setConsoleRunning(false);
+      setInputBuffer("");
       showToast(result, "info");
       if (pkg) {
         await killApp(selectedDevice, pkg);
@@ -176,17 +150,42 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
     }
   };
 
-  const handleSendInput = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== "Enter" || !input.trim() || !consoleRunning) return;
-    const line = input;
-    setInput("");
+  const sendLine = useCallback(async (line: string) => {
     setOutput((prev) => prev + "> " + line + "\n");
+    setInputBuffer("");
     try {
       await sendFridaInput(line);
     } catch (e) {
       setOutput((prev) => prev + "Error: " + e + "\n");
     }
-  };
+  }, []);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!consoleRunning) return;
+
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (inputBuffer.trim()) {
+        sendLine(inputBuffer);
+      } else {
+        setOutput((prev) => prev + "> \n");
+      }
+      return;
+    }
+
+    if (e.key === "Backspace") {
+      e.preventDefault();
+      setInputBuffer((prev) => prev.slice(0, -1));
+      return;
+    }
+
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      setInputBuffer((prev) => prev + e.key);
+    }
+  }, [consoleRunning, inputBuffer, sendLine]);
+
+  const displayText = output + (consoleRunning ? "\n> " + inputBuffer + "\u2588" : "");
 
   return (
     <div className="flex h-full flex-col p-4">
@@ -262,7 +261,7 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
         </div>
       </div>
 
-      {/* Console output */}
+      {/* Console - click to focus, type directly */}
       <div className="flex-1 min-h-0 mt-3">
         <div className="h-full rounded-lg border border-border overflow-hidden bg-background flex flex-col">
           <div className="flex items-center gap-2 border-b border-border px-3 py-1.5">
@@ -278,26 +277,15 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
 
           <div
             ref={outputRef}
-            className="flex-1 overflow-y-auto p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap selectable"
+            tabIndex={0}
+            onKeyDown={handleKeyDown}
+            className="flex-1 overflow-y-auto p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap outline-none cursor-text select-text"
           >
-            {output || (
+            {displayText || (
               <span className="text-muted-foreground italic">
                 Click Start (port forward + launch app), then Execute to run a script
               </span>
             )}
-          </div>
-
-          <div className="border-t border-border p-2">
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleSendInput}
-              placeholder={consoleRunning ? "Type JavaScript here and press Enter..." : "Execute a script first..."}
-              disabled={!consoleRunning}
-              className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs font-mono outline-none focus:ring-1 focus:ring-primary disabled:opacity-40"
-            />
           </div>
         </div>
       </div>
