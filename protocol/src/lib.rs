@@ -76,6 +76,9 @@ pub enum Action {
 
     // ── Internal ──
     ServerShutdown,
+
+    // ── Client Info ──
+    ClientInfo,
 }
 
 impl Request {

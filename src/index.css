@@ -387,18 +387,6 @@
     animation: fade-in 0.3s ease-out;
   }
 
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    background: var(--bg-image, none);
-    background-size: cover;
-    background-position: center;
-    opacity: 0.15;
-  }
-
   [data-theme="catppuccin"] body::before {
     background:
       radial-gradient(ellipse 80% 60% at 0% 100%, rgba(203,166,247,0.08) 0%, transparent 60%),

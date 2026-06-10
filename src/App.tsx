@@ -9,6 +9,8 @@ import { SettingsPage } from "@/components/pages/SettingsPage";
 import { LoginPage } from "@/components/pages/LoginPage";
 import { getAuthState, isConnected, getConfig, reconnect } from "@/hooks/tauri";
 import { applyTheme } from "@/lib/theme";
+import { subscribeToasts, dismissToast } from "@/lib/toast";
+import type { ToastItem } from "@/lib/toast";
 import type { TabId, AuthState } from "@/types";
 
 export default function App() {
@@ -18,6 +20,7 @@ export default function App() {
   const [connectionFailed, setConnectionFailed] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const pollAuth = useCallback(() => {
     getAuthState().then(setAuth).catch(() => {});
@@ -26,13 +29,14 @@ export default function App() {
 
   useEffect(() => {
     pollAuth();
-    getConfig().then((config) => applyTheme(config.settings.theme, config.settings.accent_color, config.settings.background_image)).catch(() => {});
+    getConfig().then((config) => applyTheme(config.settings.theme, config.settings.accent_color)).catch(() => {});
+    const unsub = subscribeToasts(setToasts);
     const authPoll = setInterval(pollAuth, 2000);
-    // After 10 seconds of no connection, show failed screen
     const failTimer = setTimeout(() => {
       setConnectionFailed(true);
     }, 10000);
     return () => {
+      unsub();
       clearInterval(authPoll);
       clearTimeout(failTimer);
     };
@@ -69,6 +73,24 @@ export default function App() {
             getAuthState().then(setAuth).catch(() => {});
           }}
         />
+        <div className="fixed top-10 right-4 z-50 flex flex-col gap-2 max-w-sm">
+          {toasts.map((t) => (
+            <div
+              key={t.id}
+              onClick={() => dismissToast(t.id)}
+              className={
+                "cursor-pointer rounded-lg border px-4 py-2.5 text-sm shadow-lg animate-fade-in " +
+                (t.type === "success"
+                  ? "border-green-500/30 bg-green-500/10 text-green-500"
+                  : t.type === "error"
+                    ? "border-red-500/30 bg-red-500/10 text-red-500"
+                    : "border-primary/30 bg-primary/10 text-primary")
+              }
+            >
+              {t.message}
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -105,6 +127,26 @@ export default function App() {
             <SettingsPage />
           </div>
         </main>
+      </div>
+
+      {/* Toast notifications */}
+      <div className="fixed top-10 right-4 z-50 flex flex-col gap-2 max-w-sm">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            onClick={() => dismissToast(t.id)}
+            className={
+              "cursor-pointer rounded-lg border px-4 py-2.5 text-sm shadow-lg animate-fade-in " +
+              (t.type === "success"
+                ? "border-green-500/30 bg-green-500/10 text-green-500"
+                : t.type === "error"
+                  ? "border-red-500/30 bg-red-500/10 text-red-500"
+                  : "border-primary/30 bg-primary/10 text-primary")
+            }
+          >
+            {t.message}
+          </div>
+        ))}
       </div>
     </div>
   );

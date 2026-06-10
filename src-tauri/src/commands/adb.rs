@@ -1,6 +1,6 @@
 use std::process::{Command as StdCommand, Stdio};
 use tauri::{Emitter, State};
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 use crate::state::{AppState, dbg_log};
 use crate::types::DeviceInfo;
@@ -81,8 +81,112 @@ pub async fn stop_session(state: State<'_, AppState>) -> Result<String, String> 
 }
 
 #[tauri::command]
-pub async fn execute_script(
+pub async fn start_frida_console(
     app_handle: tauri::AppHandle,
+    state: State<'_, AppState>,
+    device_id: String,
+) -> Result<String, String> {
+    dbg_log!("start_frida_console on device {}", device_id);
+
+    // Kill any existing frida process first
+    {
+        let mut child_guard = state.frida_child.lock().await;
+        if let Some(mut child) = child_guard.take() {
+            let _ = child.kill().await;
+        }
+    }
+    {
+        let mut stdin_guard = state.frida_stdin.lock().await;
+        *stdin_guard = None;
+    }
+
+    let mut child = tokio::process::Command::new(&state.frida_path)
+        .arg("-q")
+        .arg("-D")
+        .arg(&device_id)
+        .arg("-n")
+        .arg("Gadget")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| {
+            if e.to_string().contains("No such file") || e.to_string().contains("not found") {
+                "Frida not found.\n\nInstall: pip install frida".to_string()
+            } else {
+                format!("frida failed: {}", e)
+            }
+        })?;
+
+    let stdin = child.stdin.take().ok_or("No stdin")?;
+    let stdout = child.stdout.take().ok_or("No stdout")?;
+    let stderr = child.stderr.take().ok_or("No stderr")?;
+
+    *state.frida_stdin.lock().await = Some(stdin);
+    *state.frida_child.lock().await = Some(child);
+
+    let app_out = app_handle.clone();
+    tokio::spawn(async move {
+        let mut reader = BufReader::new(stdout).lines();
+        while let Some(line) = reader.next_line().await.unwrap_or(None) {
+            let _ = app_out.emit("frida-line", serde_json::json!({
+                "line": line,
+                "source": "stdout"
+            }));
+        }
+    });
+
+    let app_err = app_handle.clone();
+    tokio::spawn(async move {
+        let mut reader = BufReader::new(stderr).lines();
+        while let Some(line) = reader.next_line().await.unwrap_or(None) {
+            let _ = app_err.emit("frida-line", serde_json::json!({
+                "line": line,
+                "source": "stderr"
+            }));
+        }
+    });
+
+    state.add_log(format!("Frida console started on {}", device_id));
+    Ok("Frida console started".to_string())
+}
+
+#[tauri::command]
+pub async fn send_frida_input(
+    state: State<'_, AppState>,
+    input: String,
+) -> Result<(), String> {
+    let mut stdin_guard = state.frida_stdin.lock().await;
+    let stdin = stdin_guard.as_mut().ok_or("No active frida console")?;
+    stdin
+        .write_all(input.as_bytes())
+        .await
+        .map_err(|e| format!("Failed to send input: {}", e))?;
+    stdin
+        .write_all(b"\n")
+        .await
+        .map_err(|e| format!("Failed to send newline: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn stop_frida_console(
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let mut child_guard = state.frida_child.lock().await;
+    if let Some(mut child) = child_guard.take() {
+        let _ = child.kill().await;
+        child.wait().await.ok();
+    }
+    let mut stdin_guard = state.frida_stdin.lock().await;
+    *stdin_guard = None;
+
+    state.add_log("Frida console stopped".to_string());
+    Ok("Frida console stopped".to_string())
+}
+
+#[tauri::command]
+pub async fn execute_script(
     state: State<'_, AppState>,
     device_id: String,
     script_code: String,
@@ -121,43 +225,30 @@ pub async fn execute_script(
     let stdout = child.stdout.take().ok_or("No stdout")?;
     let stderr = child.stderr.take().ok_or("No stderr")?;
 
-    // 4. Read stdout/stderr concurrently, emit each line as event
-    let app_out = app_handle.clone();
     let stdout_task = tokio::spawn(async move {
         let mut reader = BufReader::new(stdout).lines();
         let mut out = String::new();
         while let Some(line) = reader.next_line().await.unwrap_or(None) {
             out.push_str(&line);
             out.push('\n');
-            let _ = app_out.emit("frida-line", serde_json::json!({
-                "line": line,
-                "source": "stdout"
-            }));
         }
         out
     });
 
-    let app_err = app_handle.clone();
     let stderr_task = tokio::spawn(async move {
         let mut reader = BufReader::new(stderr).lines();
         let mut out = String::new();
         while let Some(line) = reader.next_line().await.unwrap_or(None) {
             out.push_str(&line);
             out.push('\n');
-            let _ = app_err.emit("frida-line", serde_json::json!({
-                "line": line,
-                "source": "stderr"
-            }));
         }
         out
     });
 
-    // 5. Wait for output readers to finish
     let (stdout_result, stderr_result) = tokio::join!(stdout_task, stderr_task);
     let stdout_out = stdout_result.unwrap_or_default();
     let stderr_out = stderr_result.unwrap_or_default();
 
-    // 6. Wait for process to exit
     let status = child.wait().await.map_err(|e| e.to_string())?;
 
     let _ = std::fs::remove_file(&script_path);
@@ -175,10 +266,6 @@ pub async fn execute_script(
     } else {
         state.add_log(format!("Script finished with error: {}", stderr_out));
     }
-
-    let _ = app_handle.emit("frida-done", serde_json::json!({
-        "success": status.success(),
-    }));
 
     Ok(full_output)
 }

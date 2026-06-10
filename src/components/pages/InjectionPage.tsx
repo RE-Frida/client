@@ -1,19 +1,17 @@
 import { useState, useEffect, useRef } from "react";
 import {
-  Smartphone, RefreshCw, ChevronDown, Play, Square, Send,
-  FileCode2, Loader2,
+  Smartphone, RefreshCw, ChevronDown, Play, Square, Terminal,
+  FileCode2, Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  getConfig, discoverDevices, startSession, executeScript,
-  launchApp, killApp,
+  getConfig, discoverDevices, startSession, startFridaConsole,
+  stopFridaConsole, sendFridaInput, launchApp, killApp,
 } from "@/hooks/tauri";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readTextFile } from "@tauri-apps/plugin-fs";
 import { listen } from "@tauri-apps/api/event";
-import CodeMirror from "@uiw/react-codemirror";
-import { javascript } from "@codemirror/lang-javascript";
-import { oneDark } from "@codemirror/theme-one-dark";
+import { showToast } from "@/lib/toast";
 import type { DeviceInfo, AppConfig } from "@/types";
 
 interface InjectionPageProps {
@@ -28,14 +26,34 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
   const [scriptPath, setScriptPath] = useState<string | null>(null);
   const [scriptCode, setScriptCode] = useState("");
   const [output, setOutput] = useState("");
-  const [running, setRunning] = useState(false);
-  const [currentTheme, setCurrentTheme] = useState("dark");
+  const [consoleRunning, setConsoleRunning] = useState(false);
+  const [input, setInput] = useState("");
   const outputRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const unlistenRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    getConfig().then((c) => { setConfig(c); setCurrentTheme(c.settings.theme); }).catch(() => {});
+    getConfig().then((c) => { setConfig(c); }).catch(() => {});
     refreshDevices();
+
+    return () => {
+      if (unlistenRef.current) {
+        unlistenRef.current();
+      }
+    };
   }, []);
+
+  useEffect(() => {
+    if (outputRef.current) {
+      outputRef.current.scrollTop = outputRef.current.scrollHeight;
+    }
+  }, [output]);
+
+  useEffect(() => {
+    if (consoleRunning && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [consoleRunning]);
 
   const refreshDevices = async () => {
     setRefreshing(true);
@@ -65,51 +83,80 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
         const content = await readTextFile(selected);
         setScriptCode(content);
       } catch (e) {
-        setOutput("Error reading script: " + e);
+        showToast("Error reading script: " + e, "error");
       }
     }
+  };
+
+  const startListening = async () => {
+    if (unlistenRef.current) {
+      unlistenRef.current();
+    }
+    const unlisten = await listen<{ line: string; source: string }>("frida-line", (event) => {
+      setOutput((prev) => prev + event.payload.line + "\n");
+    });
+    unlistenRef.current = unlisten;
   };
 
   const handleStart = async () => {
     if (!selectedDevice) return;
     try {
+      showToast("Starting session...", "info");
       const result = await startSession(selectedDevice);
-      const launch = await launchApp(selectedDevice, pkg);
-      setOutput(result + "\n" + launch);
+      showToast(result, "success");
+
+      if (pkg) {
+        const launch = await launchApp(selectedDevice, pkg);
+        showToast(launch, "success");
+      }
+
+      await startListening();
+      const consoleResult = await startFridaConsole(selectedDevice);
+      setConsoleRunning(true);
+      setOutput("");
+
+      showToast(consoleResult, "success");
     } catch (e) {
-      setOutput("Error: " + e);
+      showToast("Error: " + e, "error");
     }
   };
 
   const handleStop = async () => {
     if (!selectedDevice) return;
     try {
-      const result = await killApp(selectedDevice, pkg);
-      setOutput(result);
+      const result = await stopFridaConsole();
+      setConsoleRunning(false);
+      showToast(result, "info");
     } catch (e) {
-      setOutput("Error: " + e);
+      showToast("Error: " + e, "error");
     }
   };
 
   const handleExecute = async () => {
-    if (!selectedDevice || !scriptCode.trim()) return;
-    setRunning(true);
-    setOutput("");
-
-    const unlisten = await listen<{ line: string; source: string }>("frida-line", (event) => {
-      setOutput((prev) => prev + event.payload.line + "\n");
-    });
-
+    if (!scriptCode.trim()) {
+      showToast("Select a script first", "info");
+      return;
+    }
+    const code = scriptCode;
+    setOutput((prev) => prev + "> Executing script: " + (scriptPath?.split("/").pop() || "script.js") + "\n");
+    setInput("");
     try {
-      const result = await executeScript(selectedDevice, scriptCode);
-      if (result) {
-        setOutput((prev) => prev + result);
-      }
+      await sendFridaInput(code);
     } catch (e) {
-      setOutput((prev) => prev + "Error: " + e);
-    } finally {
-      unlisten();
-      setRunning(false);
+      setOutput((prev) => prev + "Error: " + e + "\n");
+      showToast("Execute failed", "error");
+    }
+  };
+
+  const handleSendInput = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter" || !input.trim()) return;
+    const line = input;
+    setInput("");
+    setOutput((prev) => prev + "> " + line + "\n");
+    try {
+      await sendFridaInput(line);
+    } catch (e) {
+      setOutput((prev) => prev + "Error sending input: " + e + "\n");
     }
   };
 
@@ -117,7 +164,7 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
     <div className="flex h-full flex-col p-4">
       {/* Top toolbar */}
       <div className="flex shrink-0 items-center gap-3 rounded-lg border border-border bg-card p-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Smartphone className="h-4 w-4 text-muted-foreground shrink-0" />
           <div className="relative">
             <select
@@ -142,59 +189,88 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
           </Button>
         </div>
 
-        <div className="text-xs text-muted-foreground/50">|</div>
+        <div className="text-xs text-muted-foreground/50 shrink-0">|</div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           <FileCode2 className="h-4 w-4 text-muted-foreground shrink-0" />
-          <Button variant="outline" size="sm" onClick={handleSelectScript} className="h-7 text-xs">
-            {scriptPath ? "Change Script" : "Select Script"}
+          <Button variant="outline" size="sm" onClick={handleSelectScript} className="h-7 text-xs shrink-0">
+            {scriptPath ? "Change" : "Select Script"}
           </Button>
           {scriptPath && (
-            <span className="max-w-[200px] truncate text-xs text-muted-foreground">{scriptPath}</span>
+            <span className="truncate text-xs text-muted-foreground min-w-0">{scriptPath}</span>
           )}
-        </div>
-
-        <div className="ml-auto flex items-center gap-1.5">
-          <Button size="sm" onClick={handleStart} disabled={!selectedDevice} className="h-7 text-xs px-2">
-            <Play className="mr-1 h-3 w-3" />
-            Start
-          </Button>
-          <Button variant="destructive" size="sm" onClick={handleStop} disabled={!selectedDevice} className="h-7 text-xs px-2">
-            <Square className="mr-1 h-3 w-3" />
-            Stop
-          </Button>
           <Button
             variant="default"
             size="sm"
             onClick={handleExecute}
-            disabled={!selectedDevice || !scriptCode.trim() || running}
+            disabled={!scriptCode.trim() || !consoleRunning}
+            className="h-7 text-xs px-2 shrink-0"
+          >
+            <Send className="mr-1 h-3 w-3" />
+            Execute
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Button
+            size="sm"
+            onClick={handleStart}
+            disabled={!selectedDevice || consoleRunning}
             className="h-7 text-xs px-2"
           >
-            {running ? (
-              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-            ) : (
-              <Send className="mr-1 h-3 w-3" />
-            )}
-            Execute
+            <Play className="mr-1 h-3 w-3" />
+            Start
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={handleStop}
+            disabled={!selectedDevice || !consoleRunning}
+            className="h-7 text-xs px-2"
+          >
+            <Square className="mr-1 h-3 w-3" />
+            Stop
           </Button>
         </div>
       </div>
 
+      {/* Console output */}
       <div className="flex-1 min-h-0 mt-3">
-        <div ref={outputRef} className="h-full rounded-lg border border-border overflow-hidden">
-          <CodeMirror
-            value={output || "// Output will appear here..."}
-            height="100%"
-            theme={currentTheme === "light" ? undefined : oneDark}
-            extensions={[javascript()]}
-            readOnly
-            basicSetup={{
-              lineNumbers: false,
-              foldGutter: false,
-              highlightActiveLine: false,
-              highlightActiveLineGutter: false,
-            }}
-          />
+        <div className="h-full rounded-lg border border-border overflow-hidden bg-background flex flex-col">
+          <div className="flex items-center gap-2 border-b border-border px-3 py-1.5">
+            <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs font-medium text-muted-foreground">Frida Console</span>
+            {consoleRunning && (
+              <span className="ml-auto flex items-center gap-1 text-xs text-green-500">
+                <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                Running
+              </span>
+            )}
+          </div>
+
+          <div
+            ref={outputRef}
+            className="flex-1 overflow-y-auto p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap selectable"
+          >
+            {output || (
+              <span className="text-muted-foreground italic">
+                {consoleRunning ? "Waiting for output..." : "Click Start to launch the Frida console"}
+              </span>
+            )}
+          </div>
+
+          <div className="border-t border-border p-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleSendInput}
+              placeholder={consoleRunning ? "Type JavaScript here and press Enter..." : "Start the console first..."}
+              disabled={!consoleRunning}
+              className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs font-mono outline-none focus:ring-1 focus:ring-primary disabled:opacity-40"
+            />
+          </div>
         </div>
       </div>
     </div>

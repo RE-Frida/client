@@ -15,7 +15,6 @@ export interface AppSettings {
   custom_package: string;
   advanced_mode: boolean;
   accent_color?: string;
-  background_image?: string;
 }
 
 export interface ConfigAuth {

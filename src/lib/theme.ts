@@ -1,5 +1,3 @@
-import { convertFileSrc } from "@tauri-apps/api/core";
-
 export const ACCENT_PRESETS = [
   { name: "Blue", value: "#6366f1" },
   { name: "Purple", value: "#a855f7" },
@@ -21,7 +19,7 @@ function isLightColor(hex: string): boolean {
   return (r * 299 + g * 587 + b * 114) / 1000 > 128;
 }
 
-export function applyTheme(theme: string, accentColor?: string, bgImage?: string) {
+export function applyTheme(theme: string, accentColor?: string) {
   if (theme === "system") {
     const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
@@ -40,14 +38,5 @@ export function applyTheme(theme: string, accentColor?: string, bgImage?: string
     root.style.removeProperty("--color-ring");
     root.style.removeProperty("--color-sidebar-ring");
     root.style.removeProperty("--color-primary-foreground");
-  }
-
-  if (bgImage) {
-    const url = bgImage.startsWith("file://") || bgImage.startsWith("http://") || bgImage.startsWith("https://") || bgImage.startsWith("asset://")
-      ? bgImage
-      : convertFileSrc(bgImage);
-    root.style.setProperty("--bg-image", `url("${url}")`);
-  } else {
-    root.style.removeProperty("--bg-image");
   }
 }

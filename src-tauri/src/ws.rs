@@ -148,10 +148,27 @@ pub async fn connect_ws(state: AppState) {
     });
 
     let client = WsClient {
-        tx,
+        tx: tx.clone(),
         pending: pending.clone(),
     };
     *state.ws.write().await = Some(client);
+
+    // Report client version to server
+    let version = env!("CARGO_PKG_VERSION").to_string();
+    let version_tx = tx.clone();
+    tokio::spawn(async move {
+        let info_msg = serde_json::json!({
+            "type": "request",
+            "id": uuid::Uuid::new_v4().to_string(),
+            "action": "client_info",
+            "data": {
+                "version": version,
+                "platform": std::env::consts::OS,
+                "arch": std::env::consts::ARCH,
+            }
+        });
+        let _ = version_tx.send(info_msg.to_string()).await;
+    });
 
     // Try to restore auth from saved token
     let saved_token = state.auth.lock().unwrap().token.clone();

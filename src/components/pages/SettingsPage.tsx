@@ -118,7 +118,7 @@ export function SettingsPage() {
                         onClick={() => {
                           const newSettings = { ...config.settings, theme: theme.id };
                           setConfig({ ...config, settings: newSettings });
-                          applyTheme(theme.id, newSettings.accent_color, newSettings.background_image);
+                          applyTheme(theme.id, newSettings.accent_color);
                         }}
                         className={
                           "flex flex-col items-center gap-2 rounded-lg border p-3 text-sm transition-colors min-w-[90px] " +
@@ -138,52 +138,6 @@ export function SettingsPage() {
 
             <div>
               <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Background Image
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                {config.settings.background_image ? (
-                  <span className="max-w-[200px] truncate text-xs text-muted-foreground">
-                    {config.settings.background_image.split("/").pop()}
-                  </span>
-                ) : (
-                  <span className="text-xs text-muted-foreground">None</span>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={async () => {
-                    const { open } = await import("@tauri-apps/plugin-dialog");
-                    const selected = await open({
-                      multiple: false,
-                      filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp"] }],
-                    });
-                    if (selected) {
-                      const newSettings = { ...config.settings, background_image: selected };
-                      setConfig({ ...config, settings: newSettings });
-                      applyTheme(config.settings.theme, newSettings.accent_color, selected);
-                    }
-                  }}
-                >
-                  {config.settings.background_image ? "Change" : "Select Image"}
-                </Button>
-                {config.settings.background_image && (
-                  <button
-                    onClick={() => {
-                      const newSettings = { ...config.settings, background_image: undefined };
-                      setConfig({ ...config, settings: newSettings });
-                      applyTheme(config.settings.theme, newSettings.accent_color);
-                    }}
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Accent Color
               </p>
                 <div className="flex flex-wrap items-center gap-2">
@@ -193,7 +147,7 @@ export function SettingsPage() {
                       onClick={() => {
                         const newSettings = { ...config.settings, accent_color: preset.value };
                         setConfig({ ...config, settings: newSettings });
-                        applyTheme(config.settings.theme, preset.value, newSettings.background_image);
+                        applyTheme(config.settings.theme, preset.value);
                       }}
                       className={
                         "h-7 w-7 rounded-full border-2 transition-transform hover:scale-110 " +
@@ -211,7 +165,7 @@ export function SettingsPage() {
                     onChange={(e) => {
                       const newSettings = { ...config.settings, accent_color: e.target.value };
                       setConfig({ ...config, settings: newSettings });
-                      applyTheme(config.settings.theme, e.target.value, newSettings.background_image);
+                      applyTheme(config.settings.theme, e.target.value);
                     }}
                     className="h-7 w-7 cursor-pointer rounded-full border-0 p-0"
                   />
@@ -220,7 +174,7 @@ export function SettingsPage() {
                       onClick={() => {
                         const newSettings = { ...config.settings, accent_color: "#ef6456" };
                         setConfig({ ...config, settings: newSettings });
-                        applyTheme(config.settings.theme, "#ef6456", newSettings.background_image);
+                        applyTheme(config.settings.theme, "#ef6456");
                       }}
                       className="text-xs text-muted-foreground hover:text-foreground ml-1"
                     >

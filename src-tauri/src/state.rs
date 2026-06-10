@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use tokio::sync::{mpsc, oneshot, RwLock};
+use tokio::process::{Child, ChildStdin};
+use tokio::sync::{mpsc, oneshot, Mutex as AsyncMutex, RwLock};
 
 use re_frida_protocol::*;
 
@@ -95,6 +96,8 @@ pub struct AppState {
     pub frida_path: String,
     pub(crate) ws: Arc<RwLock<Option<WsClient>>>,
     pub connected: Arc<Mutex<bool>>,
+    pub frida_stdin: Arc<AsyncMutex<Option<ChildStdin>>>,
+    pub frida_child: Arc<AsyncMutex<Option<Child>>>,
 }
 
 impl AppState {
@@ -121,6 +124,8 @@ impl AppState {
             frida_path,
             ws: Arc::new(RwLock::new(None)),
             connected: Arc::new(Mutex::new(false)),
+            frida_stdin: Arc::new(AsyncMutex::new(None)),
+            frida_child: Arc::new(AsyncMutex::new(None)),
         }
     }
 
