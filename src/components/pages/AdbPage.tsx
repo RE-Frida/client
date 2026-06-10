@@ -2,11 +2,11 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Shell, Camera, ScrollText, RotateCcw, Package, FolderOpen,
+  Shell, ScrollText, RotateCcw, Package, FolderOpen,
   Loader2, Smartphone, RefreshCw, ChevronDown,
 } from "lucide-react";
 import {
-  adbShell, adbScreenshot, adbLogcat, adbReboot,
+  adbShell, adbLogcat, adbReboot,
   adbInstall, adbUninstall, adbListFiles,
   discoverDevices,
 } from "@/hooks/tauri";
@@ -40,8 +40,6 @@ export function AdbPage({ selectedDevice, onDeviceChange }: AdbPageProps) {
   const [shellOutput, setShellOutput] = useState("");
   const [shelling, setShelling] = useState(false);
 
-  const [screenshotting, setScreenshotting] = useState(false);
-  const [screenshotData, setScreenshotData] = useState<string | null>(null);
 
   const [logFilter, setLogFilter] = useState("");
   const [logLines, setLogLines] = useState(50);
@@ -72,20 +70,7 @@ export function AdbPage({ selectedDevice, onDeviceChange }: AdbPageProps) {
     }
   };
 
-  const takeScreenshot = async () => {
-    if (!selectedDevice) return;
-    setScreenshotting(true);
-    try {
-      const bytes = await adbScreenshot(selectedDevice);
-      const blob = new Blob([new Uint8Array(bytes)], { type: "image/png" });
-      const url = URL.createObjectURL(blob);
-      setScreenshotData(url);
-    } catch (e) {
-      setScreenshotData(null);
-    } finally {
-      setScreenshotting(false);
-    }
-  };
+
 
   const fetchLogcat = async () => {
     if (!selectedDevice) return;
@@ -203,20 +188,6 @@ export function AdbPage({ selectedDevice, onDeviceChange }: AdbPageProps) {
             <pre className="max-h-48 overflow-auto rounded bg-background p-2 text-[11px] font-mono whitespace-pre-wrap text-muted-foreground">
               {shellOutput}
             </pre>
-          )}
-        </div>
-
-        {/* Screenshot */}
-        <div className={sectionClass}>
-          <div className={sectionTitle}><Camera className="h-4 w-4" /> Screenshot</div>
-          <Button size="sm" onClick={takeScreenshot} disabled={screenshotting || !selectedDevice} className="h-8 text-xs">
-            {screenshotting ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-            {screenshotting ? "Capturing..." : "Capture"}
-          </Button>
-          {screenshotData && (
-            <div className="mt-2 rounded border border-border bg-background p-2">
-              <img src={screenshotData} alt="screenshot" className="max-h-80 w-full object-contain" />
-            </div>
           )}
         </div>
 

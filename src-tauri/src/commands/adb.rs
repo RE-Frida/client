@@ -411,41 +411,6 @@ pub async fn adb_shell(
     Ok(result)
 }
 
-#[tauri::command]
-pub async fn adb_screenshot(
-    state: State<'_, AppState>,
-    device_id: String,
-) -> Result<Vec<u8>, String> {
-    // Take screenshot on device
-    let output = StdCommand::new(&state.adb_path)
-        .arg("-s")
-        .arg(&device_id)
-        .arg("shell")
-        .arg("screencap")
-        .arg("-p")
-        .arg("/sdcard/re-frida-ss.png")
-        .output()
-        .map_err(|e| format!("screencap failed: {}", e))?;
-    if !output.status.success() {
-        return Err("screencap command failed".to_string());
-    }
-
-    // Pull the file
-    let output = StdCommand::new(&state.adb_path)
-        .arg("-s")
-        .arg(&device_id)
-        .arg("pull")
-        .arg("/sdcard/re-frida-ss.png")
-        .arg("-")  // output to stdout
-        .output()
-        .map_err(|e| format!("pull failed: {}", e))?;
-
-    if output.status.success() {
-        Ok(output.stdout)
-    } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
-    }
-}
 
 #[tauri::command]
 pub async fn adb_logcat(

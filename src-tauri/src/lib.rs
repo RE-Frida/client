@@ -144,7 +144,8 @@ pub fn run() {
             commands::adb::launch_app,
             commands::adb::kill_app,
             commands::adb::adb_shell,
-            commands::adb::adb_screenshot,
+
+
             commands::adb::adb_logcat,
             commands::adb::adb_reboot,
             commands::adb::adb_install,

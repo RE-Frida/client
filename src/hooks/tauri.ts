@@ -403,10 +403,6 @@ export async function adbShell(deviceId: string, command: string): Promise<strin
   return invoke("adb_shell", { deviceId, command });
 }
 
-export async function adbScreenshot(deviceId: string): Promise<number[]> {
-  return invoke("adb_screenshot", { deviceId });
-}
-
 export async function adbLogcat(deviceId: string, filter: string, lines: number): Promise<string> {
   return invoke("adb_logcat", { deviceId, filter, lines });
 }
