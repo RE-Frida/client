@@ -199,19 +199,19 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
           {scriptPath && (
             <span className="truncate text-xs text-muted-foreground min-w-0">{scriptPath}</span>
           )}
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
           <Button
             variant="default"
             size="sm"
             onClick={handleExecute}
             disabled={!scriptCode.trim() || !consoleRunning}
-            className="h-7 text-xs px-2 shrink-0"
+            className="h-7 text-xs px-2"
           >
             <Send className="mr-1 h-3 w-3" />
             Execute
           </Button>
-        </div>
-
-        <div className="flex items-center gap-1.5 shrink-0">
           <Button
             size="sm"
             onClick={handleStart}
