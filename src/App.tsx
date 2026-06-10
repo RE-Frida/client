@@ -73,24 +73,7 @@ export default function App() {
             getAuthState().then(setAuth).catch(() => {});
           }}
         />
-        <div className="fixed top-10 right-4 z-50 flex flex-col gap-2 max-w-sm">
-          {toasts.map((t) => (
-            <div
-              key={t.id}
-              onClick={() => dismissToast(t.id)}
-              className={
-                "cursor-pointer rounded-lg border px-4 py-2.5 text-sm shadow-lg animate-fade-in " +
-                (t.type === "success"
-                  ? "border-green-500/30 bg-green-500/10 text-green-500"
-                  : t.type === "error"
-                    ? "border-red-500/30 bg-red-500/10 text-red-500"
-                    : "border-primary/30 bg-primary/10 text-primary")
-              }
-            >
-              {t.message}
-            </div>
-          ))}
-        </div>
+        <ToastContainer toasts={toasts} />
       </div>
     );
   }
@@ -129,25 +112,31 @@ export default function App() {
         </main>
       </div>
 
-      {/* Toast notifications */}
-      <div className="fixed top-10 right-4 z-50 flex flex-col gap-2 max-w-sm">
-        {toasts.map((t) => (
-          <div
-            key={t.id}
-            onClick={() => dismissToast(t.id)}
-            className={
-              "cursor-pointer rounded-lg border px-4 py-2.5 text-sm shadow-lg animate-fade-in " +
-              (t.type === "success"
-                ? "border-green-500/30 bg-green-500/10 text-green-500"
-                : t.type === "error"
-                  ? "border-red-500/30 bg-red-500/10 text-red-500"
-                  : "border-primary/30 bg-primary/10 text-primary")
-            }
-          >
-            {t.message}
-          </div>
-        ))}
-      </div>
+      <ToastContainer toasts={toasts} />
     </div>
   );
 }
+
+function ToastContainer({ toasts }: { toasts: ToastItem[] }) {
+  return (
+    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm pointer-events-none">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          onClick={() => dismissToast(t.id)}
+          className={
+            "pointer-events-auto cursor-pointer rounded-lg border-2 px-4 py-3 text-sm shadow-xl animate-fade-in bg-card " +
+            (t.type === "success"
+              ? "border-green-500 text-green-400"
+              : t.type === "error"
+                ? "border-red-500 text-red-400"
+                : "border-primary text-primary")
+          }
+        >
+          <div className="flex items-center gap-2">
+            <span className="font-medium">{t.message}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
