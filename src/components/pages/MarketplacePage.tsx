@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Search, Download, User, Plus, Trash2, Package,
   X, Tag, FileCode, Loader2, CheckCircle2, ChevronDown, AlertTriangle,
-  Image, AlertCircle, ArrowLeft, FolderOpen, Upload, RefreshCw,
+  Image, AlertCircle, ArrowLeft, FolderOpen, Upload, RefreshCw, Pencil, Gamepad2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,7 @@ import {
   listProjects, createProject, deleteProject, downloadProject,
   listProjectFiles, getProjectFile, getAuthState,
   isProjectInstalled, getProjectDiff, updateProjectFromServer,
-  getProjectInstallPath, publishProject, openFolder,
+  getProjectInstallPath, publishProject, openFolder, updateProject,
 } from "@/hooks/tauri";
 import type { ProjectData, AuthState } from "@/types";
 
@@ -38,6 +38,7 @@ export function Marketplace() {
   const [createIconPreview, setCreateIconPreview] = useState<string | null>(null);
   const [createCategory, setCreateCategory] = useState("Tools");
   const [createTags, setCreateTags] = useState("");
+  const [createGameVersion, setCreateGameVersion] = useState("");
   const [creating, setCreating] = useState(false);
   const [installed, setInstalled] = useState<Set<string>>(new Set());
   const [showInstalled, setShowInstalled] = useState(false);
@@ -55,10 +56,23 @@ export function Marketplace() {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
   const [publishing, setPublishing] = useState<string | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState<{ current: number; total: number } | null>(null);
 
   // Delete confirmation
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ProjectData | null>(null);
+
+  // Edit dialog
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editTarget, setEditTarget] = useState<ProjectData | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editIcon, setEditIcon] = useState("");
+  const [editIconPreview, setEditIconPreview] = useState<string | null>(null);
+  const [editCategory, setEditCategory] = useState("Tools");
+  const [editTags, setEditTags] = useState("");
+  const [editGameVersion, setEditGameVersion] = useState("");
+  const [editing, setEditing] = useState(false);
 
   const checkInstalled = useCallback(async (projects: ProjectData[]) => {
     const result = new Set<string>();
@@ -162,28 +176,32 @@ export function Marketplace() {
     if (!downloadTarget) return;
     setShowDownloadWarning(false);
     setDownloading(downloadTarget.id);
+    setDownloadProgress({ current: 0, total: 1 });
     try {
-      await downloadProject(downloadTarget.id);
+      await downloadProject(downloadTarget.id, (c, t) => setDownloadProgress({ current: c, total: t }));
       setInstalled((prev) => new Set(prev).add(downloadTarget!.id));
       setDiffMap((prev) => new Map(prev).set(downloadTarget!.id, false));
     } catch (e) {
       console.error("Failed to download project:", e);
     } finally {
       setDownloading(null);
+      setDownloadProgress(null);
       setDownloadTarget(null);
     }
   };
 
   const handleUpdate = async (project: ProjectData) => {
     setUpdating(project.id);
+    setDownloadProgress({ current: 0, total: 1 });
     try {
       const path = await getProjectInstallPath(project.id);
-      await updateProjectFromServer(project.id, path);
+      await updateProjectFromServer(project.id, path, (c, t) => setDownloadProgress({ current: c, total: t }));
       setDiffMap((prev) => new Map(prev).set(project.id, false));
     } catch (e) {
       console.error("Failed to update project:", e);
     } finally {
       setUpdating(null);
+      setDownloadProgress(null);
     }
   };
 
@@ -230,6 +248,47 @@ export function Marketplace() {
     }
   };
 
+  const handleEditClick = (project: ProjectData) => {
+    setEditTarget(project);
+    setEditName(project.name);
+    setEditDescription(project.description);
+    setEditIcon(project.icon);
+    setEditIconPreview(hasValidIcon(project) ? project.icon : null);
+    setEditCategory(project.category);
+    setEditTags(project.tags.join(", "));
+    setEditGameVersion(project.game_version || "");
+    setShowEditDialog(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!editTarget || !editName.trim()) return;
+    if (editName.length > 32) return;
+    if (editDescription.length > 128) return;
+    const tags = editTags.split(",").map((t) => t.trim()).filter(Boolean);
+    if (tags.length > 10) return;
+    setEditing(true);
+    try {
+      const updated = await updateProject(
+        editTarget.id,
+        editName.trim(),
+        editDescription.trim() || undefined,
+        editIcon || undefined,
+        editCategory,
+        tags.length ? tags : undefined,
+        editGameVersion || undefined,
+      );
+      if (viewProject?.id === editTarget.id) {
+        setViewProject(updated);
+      }
+      await fetchProjects();
+      setShowEditDialog(false);
+    } catch (e) {
+      console.error("Failed to update project:", e);
+    } finally {
+      setEditing(false);
+    }
+  };
+
   const handleCreate = async () => {
     if (!createName.trim()) return;
     if (createName.length > 32) return;
@@ -241,7 +300,7 @@ export function Marketplace() {
     if (tags.length > 10) return;
     setCreating(true);
     try {
-      await createProject(createName, createDescription, createIcon, createCategory, tags);
+      await createProject(createName, createDescription, createIcon, createCategory, tags, createGameVersion);
       setShowCreateDialog(false);
       setCreateName("");
       setCreateDescription("");
@@ -249,6 +308,7 @@ export function Marketplace() {
       setCreateIconPreview(null);
       setCreateCategory("Tools");
       setCreateTags("");
+      setCreateGameVersion("");
       await fetchProjects();
     } catch (e) {
       console.error("Failed to create project:", e);
@@ -257,7 +317,7 @@ export function Marketplace() {
     }
   };
 
-  const handlePickIcon = async () => {
+  const handlePickIcon = async (setIcon: (v: string) => void, setPreview: (v: string | null) => void) => {
     try {
       const selected = await open({
         multiple: false,
@@ -270,8 +330,8 @@ export function Marketplace() {
         const ext = selected.split(".").pop()?.toLowerCase() || "png";
         const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : ext === "gif" ? "image/gif" : ext === "webp" ? "image/webp" : "image/png";
         const dataUrl = `data:${mime};base64,${base64}`;
-        setCreateIcon(dataUrl);
-        setCreateIconPreview(dataUrl);
+        setIcon(dataUrl);
+        setPreview(dataUrl);
       }
     } catch (e) {
       console.error("Failed to pick icon:", e);
@@ -283,10 +343,8 @@ export function Marketplace() {
     return project.author === auth.username;
   };
 
-  const tagsCount = createTags
-    .split(",")
-    .map((t) => t.trim())
-    .filter(Boolean).length;
+  const tagsCount = (tags: string) =>
+    tags.split(",").map((t) => t.trim()).filter(Boolean).length;
 
   const renderProjectActions = (project: ProjectData, inCard: boolean = false) => {
     const isInstalled = installed.has(project.id);
@@ -358,6 +416,18 @@ export function Marketplace() {
     );
   };
 
+  const ProgressBar = ({ current, total }: { current: number; total: number }) => {
+    const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+    return (
+      <div className="flex items-center gap-2">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+          <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${pct}%` }} />
+        </div>
+        <span className="text-xs text-muted-foreground w-12 text-right">{current}/{total}</span>
+      </div>
+    );
+  };
+
   return (
     <div className="flex h-full flex-col gap-4 p-4">
       <div className="flex items-center justify-between">
@@ -373,8 +443,8 @@ export function Marketplace() {
         )}
       </div>
 
-      <div className="flex gap-3">
-        <div className="relative flex-1">
+      <div className="flex flex-wrap gap-3">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search projects..."
@@ -383,13 +453,14 @@ export function Marketplace() {
             className="pl-9"
           />
         </div>
-        <div className="flex gap-1">
+        <div className="flex gap-1 flex-wrap">
           {CATEGORIES.map((cat) => (
             <Button
               key={cat}
               variant={category === cat ? "default" : "outline"}
               size="sm"
               onClick={() => setCategory(cat)}
+              className="min-w-[4.5rem]"
             >
               {cat}
             </Button>
@@ -427,14 +498,24 @@ export function Marketplace() {
                 Refresh
               </Button>
               {isOwner(viewProject) && (
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => handleDeleteClick(viewProject)}
-                >
-                  <Trash2 className="mr-1.5 h-3 w-3" />
-                  Delete
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleEditClick(viewProject)}
+                  >
+                    <Pencil className="mr-1.5 h-3 w-3" />
+                    Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => handleDeleteClick(viewProject)}
+                  >
+                    <Trash2 className="mr-1.5 h-3 w-3" />
+                    Delete
+                  </Button>
+                </>
               )}
             </div>
             <Card>
@@ -461,6 +542,12 @@ export function Marketplace() {
                       <Badge variant="secondary">{viewProject.category}</Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">{viewProject.description}</p>
+                    {viewProject.game_version && (
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Gamepad2 className="h-3 w-3" />
+                        Brawl Stars {viewProject.game_version}
+                      </div>
+                    )}
                     {viewProject.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {viewProject.tags.map((tag) => (
@@ -475,6 +562,12 @@ export function Marketplace() {
                     </div>
                   </div>
                 </div>
+
+                {downloadProgress && (downloading === viewProject.id || updating === viewProject.id) && (
+                  <div className="mb-4">
+                    <ProgressBar current={downloadProgress.current} total={downloadProgress.total} />
+                  </div>
+                )}
 
                 <div>
                   <h3 className="text-sm font-medium mb-2 flex items-center gap-1.5">
@@ -585,6 +678,12 @@ export function Marketplace() {
                         <Download className="h-3 w-3" />
                         {project.downloads.toLocaleString()}
                       </span>
+                      {project.game_version && (
+                        <span className="flex items-center gap-1">
+                          <Gamepad2 className="h-3 w-3" />
+                          {project.game_version}
+                        </span>
+                      )}
                       {installed.has(project.id) && (
                         <Badge variant="secondary" className="text-[10px] gap-1">
                           <CheckCircle2 className="h-2.5 w-2.5" />
@@ -675,7 +774,7 @@ export function Marketplace() {
               <div className="space-y-2">
                 <label className="text-sm font-medium">Icon</label>
                 <div className="flex items-center gap-3">
-                  <Button variant="outline" size="sm" onClick={handlePickIcon}>
+                  <Button variant="outline" size="sm" onClick={() => handlePickIcon(setCreateIcon, setCreateIconPreview)}>
                     <Image className="mr-1.5 h-4 w-4" />
                     Choose Image
                   </Button>
@@ -704,9 +803,20 @@ export function Marketplace() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium flex items-center gap-2">
+                  <Gamepad2 className="h-3.5 w-3.5" />
+                  <span>Brawl Stars Version</span>
+                </label>
+                <Input
+                  placeholder="e.g. v67"
+                  value={createGameVersion}
+                  onChange={(e) => setCreateGameVersion(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
                   <span>Tags (comma-separated)</span>
                   <span className="text-[10px] text-muted-foreground">
-                    {tagsCount}/10
+                    {tagsCount(createTags)}/10
                   </span>
                 </label>
                 <div className="relative">
@@ -724,7 +834,7 @@ export function Marketplace() {
                     className="pl-9"
                   />
                 </div>
-                {tagsCount >= 10 && (
+                {tagsCount(createTags) >= 10 && (
                   <p className="text-[10px] text-destructive flex items-center gap-1">
                     <AlertCircle className="h-3 w-3" />
                     Maximum 10 tags
@@ -737,10 +847,126 @@ export function Marketplace() {
                 </Button>
                 <Button
                   onClick={handleCreate}
-                  disabled={!createName.trim() || creating || tagsCount > 10}
+                  disabled={!createName.trim() || creating || tagsCount(createTags) > 10}
                 >
                   {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Create
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Edit Dialog */}
+      {showEditDialog && editTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Edit Project</CardTitle>
+                <Button variant="ghost" size="icon" onClick={() => setShowEditDialog(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <CardDescription>Update your project details</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <span>Name</span>
+                  <span className="text-[10px] text-muted-foreground">{editName.length}/32</span>
+                </label>
+                <Input
+                  value={editName}
+                  onChange={(e) => {
+                    if (e.target.value.length <= 32) setEditName(e.target.value);
+                  }}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <span>Description</span>
+                  <span className="text-[10px] text-muted-foreground">{editDescription.length}/128</span>
+                </label>
+                <Input
+                  value={editDescription}
+                  onChange={(e) => {
+                    if (e.target.value.length <= 128) setEditDescription(e.target.value);
+                  }}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Icon</label>
+                <div className="flex items-center gap-3">
+                  <Button variant="outline" size="sm" onClick={() => handlePickIcon(setEditIcon, setEditIconPreview)}>
+                    <Image className="mr-1.5 h-4 w-4" />
+                    {editIcon ? "Change Image" : "Choose Image"}
+                  </Button>
+                  {editIconPreview && (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted overflow-hidden">
+                      <img src={editIconPreview} alt="icon" className="h-full w-full object-cover" />
+                    </div>
+                  )}
+                  {editIcon && !editIconPreview && (
+                    <span className="text-xs text-muted-foreground">Icon set</span>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Category</label>
+                <div className="flex flex-wrap gap-1">
+                  {CATEGORIES.filter((c) => c !== "All").map((cat) => (
+                    <Button
+                      key={cat}
+                      variant={editCategory === cat ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setEditCategory(cat)}
+                      type="button"
+                    >
+                      {cat}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Gamepad2 className="h-3.5 w-3.5" />
+                  <span>Brawl Stars Version</span>
+                </label>
+                <Input
+                  placeholder="e.g. v67"
+                  value={editGameVersion}
+                  onChange={(e) => setEditGameVersion(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <span>Tags (comma-separated)</span>
+                  <span className="text-[10px] text-muted-foreground">{tagsCount(editTags)}/10</span>
+                </label>
+                <Input
+                  placeholder="frida, hooking, android"
+                  value={editTags}
+                  onChange={(e) => setEditTags(e.target.value)}
+                />
+                {tagsCount(editTags) >= 10 && (
+                  <p className="text-[10px] text-destructive flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    Maximum 10 tags
+                  </p>
+                )}
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleEditSave}
+                  disabled={!editName.trim() || editing || tagsCount(editTags) > 10}
+                >
+                  {editing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save
                 </Button>
               </div>
             </CardContent>

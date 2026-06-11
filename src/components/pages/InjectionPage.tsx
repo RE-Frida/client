@@ -189,7 +189,7 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
             <select
               value={selectedDevice || ""}
               onChange={(e) => onDeviceChange(e.target.value || null)}
-              className="appearance-none rounded-md border border-border bg-background py-1.5 pl-2 pr-6 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+              className="py-1.5 pl-2 pr-6 text-xs"
             >
               {devices.length === 0 ? (
                 <option value="">No devices</option>

@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   LayoutDashboard,
   Store,
-  Send,
+  Syringe,
   ScrollText,
   Settings,
   LogOut,
@@ -10,7 +10,9 @@ import {
   PanelLeftOpen,
   PanelLeftClose,
   Terminal,
+  Disc,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { logout } from "@/hooks/tauri";
 import type { TabId, AuthState } from "@/types";
@@ -24,7 +26,7 @@ interface SidebarProps {
 
 const navItems: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "injection", label: "Injection", icon: Send },
+  { id: "injection", label: "Injection", icon: Syringe },
   { id: "adb", label: "ADB", icon: Terminal },
   { id: "marketplace", label: "Marketplace", icon: Store },
   { id: "logs", label: "Logs", icon: ScrollText },
@@ -40,6 +42,7 @@ export function Sidebar({
   const [collapsed, setCollapsed] = useState(() =>
     localStorage.getItem("sidebar_collapsed") === "true"
   );
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const toggle = () => {
     setCollapsed((prev) => {
@@ -112,8 +115,8 @@ export function Sidebar({
       <div className="border-t border-sidebar-border px-1.5 py-2">
         <div
           className={cn(
-            "flex items-center",
-            collapsed ? "justify-center" : "gap-2"
+            "flex items-center gap-2 group/account",
+            collapsed ? "justify-center" : ""
           )}
         >
           <div className="relative h-6 w-6 shrink-0">
@@ -133,21 +136,50 @@ export function Sidebar({
             </div>
           </div>
           {!collapsed && (
-            <>
-              <span className="flex-1 truncate text-xs font-medium text-sidebar-foreground">
+            <div className="flex flex-1 min-w-0 items-center gap-1">
+              <span className="truncate text-xs font-medium text-sidebar-foreground group-hover/account:hidden">
                 {auth.username}
               </span>
+              <span className="hidden truncate text-[10px] text-sidebar-foreground/60 group-hover/account:block">
+                <Disc className="mr-1 inline h-2.5 w-2.5" />
+                {auth.discord_id ? `ID: ${auth.discord_id}` : "Discord"}
+              </span>
               <button
-                onClick={handleLogout}
-                className="rounded p-1 text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                onClick={() => setShowLogoutConfirm(true)}
+                className="rounded p-1 text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground shrink-0"
                 title="Logout"
               >
                 <LogOut className="h-3.5 w-3.5" />
               </button>
-            </>
+            </div>
           )}
         </div>
       </div>
+
+      {/* Logout Confirmation */}
+      {showLogoutConfirm && (
+        <div className="absolute bottom-14 left-2 right-2 z-30 rounded-lg border border-border bg-card p-3 shadow-lg">
+          <p className="mb-2 text-xs font-medium">Log out of RE:Frida?</p>
+          <div className="flex gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 h-7 text-xs"
+              onClick={() => setShowLogoutConfirm(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              className="flex-1 h-7 text-xs"
+              onClick={() => { setShowLogoutConfirm(false); handleLogout(); }}
+            >
+              Logout
+            </Button>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }

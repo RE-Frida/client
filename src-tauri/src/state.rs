@@ -116,6 +116,8 @@ impl AppState {
             username: None,
             avatar_url: None,
             token: config.auth.token.clone(),
+            discord_id: None,
+            linked_since: None,
         };
 
         Self {

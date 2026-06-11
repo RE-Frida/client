@@ -12,8 +12,7 @@ const EMBEDDED_CERT: &[u8] = include_bytes!("../embedded_cert.pem");
 
 /// Connect to the server with TLS and SPKI pinning
 pub async fn connect_ws(state: AppState) {
-    // Clear any previous client version error
-    *state.client_outdated.lock().unwrap() = None;
+    *state.client_outdated.lock().unwrap_or_else(|e| e.into_inner()) = None;
 
     let url = SERVER_URL;
     let pending: PendingRequests = Arc::new(Mutex::new(std::collections::HashMap::new()));
@@ -21,20 +20,18 @@ pub async fn connect_ws(state: AppState) {
     let auth_state = state.auth.clone();
     let log_buffer = state.log_buffer.clone();
 
-    // Create crypto key for message signing
     let crypto_key = CryptoKey::new();
 
-    // Connect with TLS verification
     let ws_stream = match connect_with_tls(url).await {
         Ok(stream) => stream,
         Err(_e) => {
-            *connected.lock().unwrap() = false;
+            *connected.lock().unwrap_or_else(|e| e.into_inner()) = false;
             dbg_log!("WS connect failed: {}", _e);
             return;
         }
     };
 
-    *connected.lock().unwrap() = true;
+    *connected.lock().unwrap_or_else(|e| e.into_inner()) = true;
     dbg_log!("WS connected to {}", url);
 
     let (mut ws_sink, mut ws_stream) = ws_stream.split();
@@ -54,19 +51,57 @@ pub async fn connect_ws(state: AppState) {
         }
     });
 
-    // Spawn reader task
+    // Spawn reader task (captures tx for Pong replies)
     let pending_clone = pending.clone();
     let connected_clone = connected.clone();
     let log_clone = log_buffer.clone();
+    let reader_tx = tx.clone();
+    let reader_key = crypto_key.as_bytes().to_vec();
     tokio::spawn(async move {
         while let Some(msg) = ws_stream.next().await {
             match msg {
                 Ok(tokio_tungstenite::tungstenite::Message::Text(text)) => {
                     let text: String = text.into();
                     dbg_log!("WS RECV: {}", text);
+
+                    // Check for signed ping/pong at raw JSON level
+                    // (before WsMessage parsing, which would drop extra fields)
+                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&text) {
+                        if let Some(msg_type) = val.get("type").and_then(|v| v.as_str()) {
+                            match msg_type {
+                                "ping" => {
+                                    let timestamp = val.get("timestamp")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("");
+                                    let signature = val.get("signature")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("");
+                                    // Verify server's ping signature
+                                    if crypto::hmac_verify(&reader_key, timestamp.as_bytes(), signature) {
+                                        // Send signed pong back
+                                        let ts = chrono::Utc::now().timestamp().to_string();
+                                        let sig = crypto::hmac_sign(&reader_key, ts.as_bytes());
+                                        let pong = serde_json::json!({
+                                            "type": "pong",
+                                            "timestamp": ts,
+                                            "signature": crypto::base64_encode(&sig)
+                                        });
+                                        let _ = reader_tx.send(pong.to_string()).await;
+                                    }
+                                    continue;
+                                }
+                                "pong" => {
+                                    // Verify pong signature (optional keepalive ack)
+                                    continue;
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+
                     match serde_json::from_str::<WsMessage>(&text) {
                         Ok(WsMessage::Response(resp)) => {
-                            if let Some(sender) = pending_clone.lock().unwrap().remove(&resp.id) {
+                            if let Some(sender) = pending_clone.lock().unwrap_or_else(|e| e.into_inner()).remove(&resp.id) {
                                 let _ = sender.send(resp);
                             }
                         }
@@ -77,7 +112,7 @@ pub async fn connect_ws(state: AppState) {
                                     message,
                                     level,
                                 } => {
-                                    let mut logs = log_clone.lock().unwrap();
+                                    let mut logs = log_clone.lock().unwrap_or_else(|e| e.into_inner());
                                     logs.push(format!(
                                         "[{}] [{}] {}",
                                         chrono::Local::now().format("%H:%M:%S"),
@@ -92,6 +127,10 @@ pub async fn connect_ws(state: AppState) {
                         }
                         Ok(WsMessage::Ping) => {
                             dbg_log!("WS PING received");
+                            // Respond with WsMessage::Pong
+                            if let Ok(json) = serde_json::to_string(&WsMessage::Pong) {
+                                let _ = reader_tx.send(json).await;
+                            }
                         }
                         Ok(WsMessage::Auth(_)) => {}
                         Ok(WsMessage::Request(_)) => {}
@@ -119,32 +158,24 @@ pub async fn connect_ws(state: AppState) {
                 }
             }
         }
-        *connected_clone.lock().unwrap() = false;
+        *connected_clone.lock().unwrap_or_else(|e| e.into_inner()) = false;
         dbg_log!("WS disconnected");
     });
 
-    // Spawn ping task with HMAC signing
+    // Spawn heartbeat ping task (sends signed pings)
     let tx_ping = tx.clone();
     let ping_key = crypto_key.as_bytes().to_vec();
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-
-            // Sign the ping message
             let timestamp = chrono::Utc::now().timestamp().to_string();
             let signature = hmac_sign(&ping_key, timestamp.as_bytes());
-
             let ping_msg = serde_json::json!({
                 "type": "ping",
                 "timestamp": timestamp,
                 "signature": crypto::base64_encode(&signature)
             });
-
-            if tx_ping
-                .send(ping_msg.to_string())
-                .await
-                .is_err()
-            {
+            if tx_ping.send(ping_msg.to_string()).await.is_err() {
                 break;
             }
         }
@@ -156,11 +187,11 @@ pub async fn connect_ws(state: AppState) {
     };
     *state.ws.write().await = Some(client);
 
-    // Report client version to server and check for version rejection
+    // Report client version to server
     let version = app_version_from_config();
     let ci_id = uuid::Uuid::new_v4().to_string();
     let (ci_tx, mut ci_rx) = tokio::sync::oneshot::channel::<Response>();
-    pending.lock().unwrap().insert(ci_id.clone(), ci_tx);
+    pending.lock().unwrap_or_else(|e| e.into_inner()).insert(ci_id.clone(), ci_tx);
 
     let ci_msg = WsMessage::Request(Request {
         id: ci_id,
@@ -176,14 +207,13 @@ pub async fn connect_ws(state: AppState) {
         let _ = tx.send(json).await;
     }
 
-    // Wait for ClientInfo response with timeout
     match tokio::time::timeout(std::time::Duration::from_secs(5), &mut ci_rx).await {
         Ok(Ok(resp)) => {
             if !resp.ok {
                 let error = resp.error.unwrap_or_else(|| "Update required".to_string());
                 dbg_log!("Server rejected client version: {}", error);
-                *state.client_outdated.lock().unwrap() = Some(error);
-                *connected.lock().unwrap() = false;
+                *state.client_outdated.lock().unwrap_or_else(|e| e.into_inner()) = Some(error);
+                *connected.lock().unwrap_or_else(|e| e.into_inner()) = false;
                 return;
             }
         }
@@ -196,7 +226,7 @@ pub async fn connect_ws(state: AppState) {
     }
 
     // Try to restore auth from saved token
-    let saved_token = state.auth.lock().unwrap().token.clone();
+    let saved_token = state.auth.lock().unwrap_or_else(|e| e.into_inner()).token.clone();
     if let Some(token) = saved_token {
         let ws_guard = state.ws.read().await;
         if let Some(ws) = ws_guard.as_ref() {
@@ -211,18 +241,21 @@ pub async fn connect_ws(state: AppState) {
                     if let Some(data) = &resp.data {
                         if let Ok(auth_result) = serde_json::from_value::<AuthResult>(data.clone())
                         {
-                            let mut auth = auth_state.lock().unwrap();
+                            let mut auth = auth_state.lock().unwrap_or_else(|e| e.into_inner());
                             auth.authenticated = auth_result.is_guild_member;
                             auth.username =
                                 auth_result.user.as_ref().map(|u| u.username.clone());
                             auth.avatar_url =
                                 auth_result.user.as_ref().and_then(|u| u.avatar.clone());
+                            auth.discord_id =
+                                auth_result.user.as_ref().map(|u| u.id.clone());
                         }
                     }
                 }
             }
         }
     }
+
 }
 
 /// Connect to WebSocket with TLS using embedded certificate
@@ -237,10 +270,8 @@ async fn connect_with_tls(
     if use_tls {
         dbg_log!("Connecting with TLS using embedded certificate");
 
-        // Build TLS connector that trusts our embedded self-signed cert
         let mut builder = native_tls::TlsConnector::builder();
 
-        // Add our embedded cert as a trusted root CA
         let cert = native_tls::Certificate::from_pem(EMBEDDED_CERT)
             .map_err(|e| format!("Failed to parse embedded cert: {}", e))?;
         builder.add_root_certificate(cert);
@@ -248,7 +279,6 @@ async fn connect_with_tls(
         let connector = builder.build()
             .map_err(|e| format!("TLS connector failed: {}", e))?;
 
-        // Use connect_async_tls_with_config with custom connector
         let (ws_stream, _) = tokio_tungstenite::connect_async_tls_with_config(
             url,
             None,
@@ -262,7 +292,6 @@ async fn connect_with_tls(
 
         Ok(ws_stream)
     } else {
-        // Plain WebSocket (development only)
         dbg_log!("WARNING: Using unencrypted WebSocket connection");
         let (ws_stream, _) = tokio_tungstenite::connect_async(url)
             .await
@@ -305,7 +334,6 @@ pub async fn start_oauth_callback_server() -> mpsc::Receiver<String> {
                         .unwrap_or("");
                     let _ = tx.send(code.to_string()).await;
 
-                    // Response with security headers
                     let response = "HTTP/1.1 200 OK\r\n\
                         Content-Type: text/html\r\n\
                         X-Content-Type-Options: nosniff\r\n\
@@ -323,7 +351,6 @@ pub async fn start_oauth_callback_server() -> mpsc::Receiver<String> {
 }
 
 /// Read the app version from tauri.conf.json at compile time.
-/// This matches the GitHub release tag version, not the workspace Cargo.toml.
 fn app_version_from_config() -> String {
     let config: serde_json::Value = serde_json::from_str(include_str!("../tauri.conf.json"))
         .unwrap_or_default();

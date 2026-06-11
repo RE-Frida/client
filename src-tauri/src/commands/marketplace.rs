@@ -67,7 +67,7 @@ pub async fn download_script(
     let ws = ws_guard.as_ref().ok_or("Not connected to server")?;
     let token = state.auth.lock().unwrap().token.clone();
 
-    let data = serde_json::json!({ "script_id": script_id });
+    let data = serde_json::json!({ "id": script_id });
     let resp = ws.send_request(Action::DownloadScript, Some(data), token).await?;
 
     if !resp.ok {

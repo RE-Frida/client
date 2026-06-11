@@ -66,4 +66,6 @@ pub struct AuthState {
     pub username: Option<String>,
     pub avatar_url: Option<String>,
     pub token: Option<String>,
+    pub discord_id: Option<String>,
+    pub linked_since: Option<String>,
 }

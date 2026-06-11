@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readDir, readTextFile, writeTextFile, exists, mkdir } from "@tauri-apps/plugin-fs";
-import { join, homeDir } from "@tauri-apps/api/path";
+import { join, homeDir, dirname } from "@tauri-apps/api/path";
 import type { DeviceInfo, AppConfig, AuthState, ScriptData, ProjectData } from "@/types";
 
 // ─── ADB ────────────────────────────────────────────────────────
@@ -234,23 +234,26 @@ function isBinaryFile(path: string): boolean {
   return BINARY_EXTENSIONS.has(ext);
 }
 
-export async function downloadProject(projectId: string): Promise<string> {
+export async function downloadProject(projectId: string, onProgress?: (current: number, total: number) => void): Promise<string> {
   const home = await homeDir();
   const downloadPath = await join(home, "Documents", "RE-Frida", projectId);
-  
+
   await mkdir(downloadPath, { recursive: true });
 
   const files = await listProjectFiles(projectId);
-  for (const file of files) {
+  const total = files.length;
+  for (let i = 0; i < total; i++) {
+    const file = files[i];
     if (isBinaryFile(file)) continue;
     const content = await getProjectFile(projectId, file);
     const filePath = await join(downloadPath, file);
-    const parent = filePath.substring(0, filePath.lastIndexOf("/"));
+    const parent = await dirname(filePath);
     const parentExists = await exists(parent);
     if (!parentExists) {
       await mkdir(parent, { recursive: true });
     }
     await writeTextFile(filePath, content);
+    onProgress?.(i + 1, total);
   }
 
   return downloadPath;
@@ -325,19 +328,23 @@ export async function getProjectDiff(
 
 export async function updateProjectFromServer(
   projectId: string,
-  workspacePath: string
+  workspacePath: string,
+  onProgress?: (current: number, total: number) => void
 ): Promise<void> {
   const serverFiles = await listProjectFiles(projectId);
-  for (const file of serverFiles) {
+  const total = serverFiles.length;
+  for (let i = 0; i < total; i++) {
+    const file = serverFiles[i];
     if (isBinaryFile(file)) continue;
     const content = await getProjectFile(projectId, file);
     const filePath = await join(workspacePath, file);
-    const parent = filePath.substring(0, filePath.lastIndexOf("/"));
+    const parent = await dirname(filePath);
     const parentExists = await exists(parent);
     if (!parentExists) {
       await mkdir(parent, { recursive: true });
     }
     await writeTextFile(filePath, content);
+    onProgress?.(i + 1, total);
   }
 }
 
@@ -361,9 +368,10 @@ export async function createProject(
   description: string,
   icon: string,
   category: string,
-  tags: string[]
+  tags: string[],
+  gameVersion: string
 ): Promise<ProjectData> {
-  return invoke("create_project", { name, description, icon, category, tags });
+  return invoke("create_project", { name, description, icon, category, tags, gameVersion });
 }
 
 export async function updateProject(
@@ -372,9 +380,10 @@ export async function updateProject(
   description?: string,
   icon?: string,
   category?: string,
-  tags?: string[]
+  tags?: string[],
+  gameVersion?: string
 ): Promise<ProjectData> {
-  return invoke("update_project", { id, name, description, icon, category, tags });
+  return invoke("update_project", { id, name, description, icon, category, tags, gameVersion });
 }
 
 export async function deleteProject(projectId: string): Promise<void> {

@@ -41,7 +41,8 @@ pub async fn get_project(
         return Err(resp.error.unwrap_or_else(|| "Failed to get project".to_string()));
     }
 
-    let project: ProjectData = serde_json::from_value(resp.data.unwrap_or_default())
+    let data = resp.data.ok_or("No project data returned")?;
+    let project: ProjectData = serde_json::from_value(data)
         .map_err(|e| format!("Invalid project data: {}", e))?;
 
     Ok(project)
@@ -55,6 +56,7 @@ pub async fn create_project(
     icon: String,
     category: String,
     tags: Vec<String>,
+    game_version: String,
 ) -> Result<ProjectData, String> {
     let ws_guard = state.ws.read().await;
     let ws = ws_guard.as_ref().ok_or("Not connected to server")?;
@@ -66,6 +68,7 @@ pub async fn create_project(
         icon,
         category,
         tags,
+        game_version,
     };
     let data = serde_json::to_value(&payload).ok();
     let resp = ws.send_request(Action::CreateProject, data, Some(token)).await?;
@@ -74,7 +77,8 @@ pub async fn create_project(
         return Err(resp.error.unwrap_or_else(|| "Failed to create project".to_string()));
     }
 
-    let project: ProjectData = serde_json::from_value(resp.data.unwrap_or_default())
+    let data = resp.data.ok_or("No project data returned")?;
+    let project: ProjectData = serde_json::from_value(data)
         .map_err(|e| format!("Invalid project data: {}", e))?;
 
     Ok(project)
@@ -89,6 +93,7 @@ pub async fn update_project(
     icon: Option<String>,
     category: Option<String>,
     tags: Option<Vec<String>>,
+    game_version: Option<String>,
 ) -> Result<ProjectData, String> {
     let ws_guard = state.ws.read().await;
     let ws = ws_guard.as_ref().ok_or("Not connected to server")?;
@@ -101,6 +106,7 @@ pub async fn update_project(
         icon,
         category,
         tags,
+        game_version,
     };
     let data = serde_json::to_value(&payload).ok();
     let resp = ws.send_request(Action::UpdateProject, data, Some(token)).await?;
@@ -109,7 +115,8 @@ pub async fn update_project(
         return Err(resp.error.unwrap_or_else(|| "Failed to update project".to_string()));
     }
 
-    let project: ProjectData = serde_json::from_value(resp.data.unwrap_or_default())
+    let data = resp.data.ok_or("No project data returned")?;
+    let project: ProjectData = serde_json::from_value(data)
         .map_err(|e| format!("Invalid project data: {}", e))?;
 
     Ok(project)

@@ -47,6 +47,7 @@ export interface ProjectData {
   author_discord_id: string;
   category: string;
   tags: string[];
+  game_version: string;
   downloads: number;
   created_at: string;
   updated_at: string;
@@ -57,6 +58,8 @@ export interface AuthState {
   username: string | null;
   avatar_url: string | null;
   token: string | null;
+  discord_id: string | null;
+  linked_since: string | null;
 }
 
 export type TabId = "dashboard" | "injection" | "adb" | "marketplace" | "logs" | "settings";

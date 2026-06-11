@@ -269,6 +269,7 @@ pub struct ProjectData {
     pub author_discord_id: String,
     pub category: String,
     pub tags: Vec<String>,
+    pub game_version: String,
     pub downloads: u64,
     pub created_at: String,
     pub updated_at: String,
@@ -287,6 +288,7 @@ pub struct CreateProjectPayload {
     pub icon: String,
     pub category: String,
     pub tags: Vec<String>,
+    pub game_version: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -302,6 +304,8 @@ pub struct UpdateProjectPayload {
     pub category: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub game_version: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

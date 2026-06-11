@@ -13,16 +13,16 @@ pub async fn get_auth_state(state: State<'_, AppState>) -> Result<AuthState, Str
 
 #[tauri::command]
 pub async fn start_login(state: State<'_, AppState>) -> Result<String, String> {
-    let ws_guard = state.ws.read().await;
-    let ws = ws_guard.as_ref().ok_or("Not connected to server")?;
-
-    let resp = ws.send_request(Action::GetConfig, None, None).await?;
-    if !resp.ok {
-        return Err(resp.error.unwrap_or_else(|| "Failed to get config".to_string()));
-    }
-
-    let config_data: ServerConfigData = serde_json::from_value(resp.data.unwrap_or_default())
-        .map_err(|e| format!("Invalid config: {}", e))?;
+    let config_data: ServerConfigData = {
+        let ws_guard = state.ws.read().await;
+        let ws = ws_guard.as_ref().ok_or("Not connected to server")?;
+        let resp = ws.send_request(Action::GetConfig, None, None).await?;
+        if !resp.ok {
+            return Err(resp.error.unwrap_or_else(|| "Failed to get config".to_string()));
+        }
+        serde_json::from_value(resp.data.ok_or("No config data")?)
+            .map_err(|e| format!("Invalid config: {}", e))?
+    };
 
     let auth_url = config_data.oauth.auth_url.clone();
 
@@ -45,12 +45,16 @@ pub async fn start_login(state: State<'_, AppState>) -> Result<String, String> {
         discord_redirect_uri: Some(config_data.oauth.redirect_uri),
     };
 
-    let resp = ws.send_auth(auth_frame).await?;
+    let resp = {
+        let ws_guard = state.ws.read().await;
+        let ws = ws_guard.as_ref().ok_or("Not connected to server")?;
+        ws.send_auth(auth_frame).await?
+    };
     if !resp.ok {
         return Err(resp.error.unwrap_or_else(|| "Auth failed".to_string()));
     }
 
-    let auth_result: AuthResult = serde_json::from_value(resp.data.unwrap_or_default())
+    let auth_result: AuthResult = serde_json::from_value(resp.data.ok_or("No auth data")?)
         .map_err(|e| format!("Invalid auth response: {}", e))?;
 
     if !auth_result.is_guild_member {
@@ -62,6 +66,7 @@ pub async fn start_login(state: State<'_, AppState>) -> Result<String, String> {
     auth.token = auth_result.token.clone();
     auth.username = auth_result.user.as_ref().map(|u| u.username.clone());
     auth.avatar_url = auth_result.user.as_ref().and_then(|u| u.avatar.clone());
+    auth.discord_id = auth_result.user.as_ref().map(|u| u.id.clone());
 
     // Save auth token to config
     let mut config = state.config.lock().unwrap();

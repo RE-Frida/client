@@ -43,9 +43,23 @@ impl CryptoKey {
 pub fn hmac_sign(key: &[u8], message: &[u8]) -> Vec<u8> {
     use hmac::{Hmac, Mac};
     let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(key)
-        .expect("HMAC can take key of any size");
+        .expect("HMAC key must be valid length");
     mac.update(message);
     mac.finalize().into_bytes().to_vec()
+}
+
+pub fn hmac_verify(key: &[u8], message: &[u8], base64_sig: &str) -> bool {
+    use hmac::{Hmac, Mac};
+    use base64::Engine;
+    let Ok(signature) = base64::engine::general_purpose::STANDARD.decode(base64_sig) else {
+        return false;
+    };
+    let mut mac = match <Hmac<Sha256> as Mac>::new_from_slice(key) {
+        Ok(m) => m,
+        Err(_) => return false,
+    };
+    mac.update(message);
+    mac.verify_slice(&signature).is_ok()
 }
 
 // ─── Base64 ─────────────────────────────────────────────────────

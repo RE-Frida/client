@@ -95,7 +95,7 @@ export default function App() {
           onTabChange={setActiveTab}
           auth={auth}
           onLogout={() => {
-            setAuth({ authenticated: false, username: null, avatar_url: null, token: null });
+            setAuth({ authenticated: false, username: null, avatar_url: null, token: null, discord_id: null, linked_since: null });
           }}
         />
         <main className="flex-1 overflow-auto">

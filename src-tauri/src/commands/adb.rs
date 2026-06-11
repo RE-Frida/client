@@ -1,14 +1,35 @@
 use std::process::{Command as StdCommand, Stdio};
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use tauri::{Emitter, State};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 use crate::state::{AppState, dbg_log};
 use crate::types::DeviceInfo;
 
+fn adb_cmd(adb_path: &str) -> StdCommand {
+    let cmd = StdCommand::new(adb_path);
+    #[cfg(windows)]
+    let cmd = {
+        let mut c = cmd;
+        c.creation_flags(0x08000000);
+        c
+    };
+    cmd
+}
+
+fn adb_cmd_device(adb_path: &str, device_id: &str) -> StdCommand {
+    let mut cmd = StdCommand::new(adb_path);
+    #[cfg(windows)]
+    cmd.creation_flags(0x08000000);
+    cmd.arg("-s").arg(device_id);
+    cmd
+}
+
 #[tauri::command]
 pub async fn discover_devices(state: State<'_, AppState>) -> Result<Vec<DeviceInfo>, String> {
     dbg_log!("discover_devices called");
-    let output = StdCommand::new(&state.adb_path)
+    let output = adb_cmd(&state.adb_path)
         .arg("devices")
         .arg("-l")
         .output()
@@ -54,9 +75,7 @@ pub async fn discover_devices(state: State<'_, AppState>) -> Result<Vec<DeviceIn
 pub async fn start_session(state: State<'_, AppState>, device_id: String) -> Result<String, String> {
     let port = state.config.lock().unwrap().settings.frida_port;
 
-    let output = StdCommand::new(&state.adb_path)
-        .arg("-s")
-        .arg(&device_id)
+    let output = adb_cmd_device(&state.adb_path, &device_id)
         .arg("forward")
         .arg(format!("tcp:{}", port))
         .arg(format!("tcp:{}", port))
@@ -291,9 +310,7 @@ pub async fn push_gadget(
     device_id: String,
     gadget_path: String,
 ) -> Result<String, String> {
-    let output = StdCommand::new(&state.adb_path)
-        .arg("-s")
-        .arg(&device_id)
+    let output = adb_cmd_device(&state.adb_path, &device_id)
         .arg("push")
         .arg(&gadget_path)
         .arg("/data/local/tmp/libfrida-gadget.so")
@@ -313,9 +330,7 @@ pub async fn list_packages(
     state: State<'_, AppState>,
     device_id: String,
 ) -> Result<Vec<String>, String> {
-    let output = StdCommand::new(&state.adb_path)
-        .arg("-s")
-        .arg(&device_id)
+    let output = adb_cmd_device(&state.adb_path, &device_id)
         .arg("shell")
         .arg("pm")
         .arg("list")
@@ -342,9 +357,7 @@ pub async fn launch_app(
     device_id: String,
     package_id: String,
 ) -> Result<String, String> {
-    let output = StdCommand::new(&state.adb_path)
-        .arg("-s")
-        .arg(&device_id)
+    let output = adb_cmd_device(&state.adb_path, &device_id)
         .arg("shell")
         .arg("monkey")
         .arg("-p")
@@ -369,9 +382,7 @@ pub async fn kill_app(
     device_id: String,
     package_id: String,
 ) -> Result<String, String> {
-    let output = StdCommand::new(&state.adb_path)
-        .arg("-s")
-        .arg(&device_id)
+    let output = adb_cmd_device(&state.adb_path, &device_id)
         .arg("shell")
         .arg("am")
         .arg("force-stop")
@@ -393,9 +404,7 @@ pub async fn adb_shell(
     device_id: String,
     command: String,
 ) -> Result<String, String> {
-    let output = StdCommand::new(&state.adb_path)
-        .arg("-s")
-        .arg(&device_id)
+    let output = adb_cmd_device(&state.adb_path, &device_id)
         .arg("shell")
         .arg(&command)
         .output()
@@ -419,8 +428,8 @@ pub async fn adb_logcat(
     filter: String,
     lines: u32,
 ) -> Result<String, String> {
-    let mut cmd = StdCommand::new(&state.adb_path);
-    cmd.arg("-s").arg(&device_id).arg("logcat");
+    let mut cmd = adb_cmd_device(&state.adb_path, &device_id);
+    cmd.arg("logcat");
     if !filter.is_empty() {
         cmd.arg("-s").arg(&filter);
     }
@@ -438,8 +447,7 @@ pub async fn adb_reboot(
     device_id: String,
     mode: String,
 ) -> Result<String, String> {
-    let mut cmd = StdCommand::new(&state.adb_path);
-    cmd.arg("-s").arg(&device_id);
+    let mut cmd = adb_cmd_device(&state.adb_path, &device_id);
     match mode.as_str() {
         "recovery" => { cmd.arg("reboot").arg("recovery"); }
         "bootloader" => { cmd.arg("reboot").arg("bootloader"); }
@@ -460,9 +468,7 @@ pub async fn adb_install(
     device_id: String,
     apk_path: String,
 ) -> Result<String, String> {
-    let output = StdCommand::new(&state.adb_path)
-        .arg("-s")
-        .arg(&device_id)
+    let output = adb_cmd_device(&state.adb_path, &device_id)
         .arg("install")
         .arg("-r")
         .arg(&apk_path)
@@ -482,9 +488,7 @@ pub async fn adb_uninstall(
     device_id: String,
     package_id: String,
 ) -> Result<String, String> {
-    let output = StdCommand::new(&state.adb_path)
-        .arg("-s")
-        .arg(&device_id)
+    let output = adb_cmd_device(&state.adb_path, &device_id)
         .arg("uninstall")
         .arg(&package_id)
         .output()
@@ -503,9 +507,7 @@ pub async fn adb_list_files(
     device_id: String,
     path: String,
 ) -> Result<String, String> {
-    let output = StdCommand::new(&state.adb_path)
-        .arg("-s")
-        .arg(&device_id)
+    let output = adb_cmd_device(&state.adb_path, &device_id)
         .arg("shell")
         .arg("ls")
         .arg("-la")
