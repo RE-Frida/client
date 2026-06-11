@@ -363,6 +363,15 @@
     -webkit-user-select: text;
   }
 
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+
   .cm-editor {
     height: 100%;
   }
@@ -455,16 +464,6 @@
     background: radial-gradient(circle, color-mix(in srgb, var(--color-primary) 12%, transparent) 0%, transparent 70%);
     animation: wave-float-3 18s ease-in-out infinite;
     animation-delay: -10s;
-  }
-
-  /* Slide-in animation for page transitions */
-  @keyframes slide-up {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .page-enter {
-    animation: slide-up 0.3s ease-out;
   }
 
   [data-theme="catppuccin"] body::before {

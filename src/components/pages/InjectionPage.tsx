@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
-  Smartphone, RefreshCw, ChevronDown, Play, Square, Terminal,
+  Smartphone, RefreshCw, Play, Square, Terminal,
   FileCode2, Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -185,24 +185,21 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
       <div className="flex shrink-0 items-center gap-3 rounded-lg border border-border bg-card p-3">
         <div className="flex items-center gap-2 shrink-0">
           <Smartphone className="h-4 w-4 text-muted-foreground shrink-0" />
-          <div className="relative">
-            <select
-              value={selectedDevice || ""}
-              onChange={(e) => onDeviceChange(e.target.value || null)}
-              className="py-1.5 pl-2 pr-6 text-xs"
-            >
-              {devices.length === 0 ? (
-                <option value="">No devices</option>
-              ) : (
-                devices.map((dev) => (
-                  <option key={dev.id} value={dev.id}>
-                    {dev.model || dev.id}
-                  </option>
-                ))
-              )}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-1 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
-          </div>
+          <select
+            value={selectedDevice || ""}
+            onChange={(e) => onDeviceChange(e.target.value || null)}
+            className="py-1.5 pl-2 pr-6 text-xs"
+          >
+            {devices.length === 0 ? (
+              <option value="">No devices</option>
+            ) : (
+              devices.map((dev) => (
+                <option key={dev.id} value={dev.id}>
+                  {dev.model || dev.id}
+                </option>
+              ))
+            )}
+          </select>
           <Button variant="ghost" size="sm" onClick={refreshDevices} disabled={refreshing} className="h-7 px-1.5">
             <RefreshCw className={"h-3 w-3" + (refreshing ? " animate-spin" : "")} />
           </Button>

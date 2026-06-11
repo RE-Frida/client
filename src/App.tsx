@@ -99,28 +99,28 @@ export default function App() {
           }}
         />
         <main className="flex-1 overflow-auto">
-          <div className={"h-full page-enter" + (activeTab === "dashboard" ? "" : " hidden")}>
+          <div className={"h-full" + (activeTab === "dashboard" ? "" : " hidden")}>
             <Dashboard />
           </div>
-          <div className={"h-full page-enter" + (activeTab === "injection" ? "" : " hidden")}>
+          <div className={"h-full" + (activeTab === "injection" ? "" : " hidden")}>
             <InjectionPage
               selectedDevice={selectedDevice}
               onDeviceChange={setSelectedDevice}
             />
           </div>
-          <div className={"h-full page-enter" + (activeTab === "marketplace" ? "" : " hidden")}>
+          <div className={"h-full" + (activeTab === "marketplace" ? "" : " hidden")}>
             <Marketplace />
           </div>
-          <div className={"h-full page-enter" + (activeTab === "adb" ? "" : " hidden")}>
+          <div className={"h-full" + (activeTab === "adb" ? "" : " hidden")}>
             <AdbPage
               selectedDevice={selectedDevice}
               onDeviceChange={setSelectedDevice}
             />
           </div>
-          <div className={"h-full page-enter" + (activeTab === "logs" ? "" : " hidden")}>
+          <div className={"h-full" + (activeTab === "logs" ? "" : " hidden")}>
             <LogsPage />
           </div>
-          <div className={"h-full page-enter" + (activeTab === "settings" ? "" : " hidden")}>
+          <div className={"h-full" + (activeTab === "settings" ? "" : " hidden")}>
             <SettingsPage />
           </div>
         </main>

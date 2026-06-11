@@ -110,8 +110,7 @@ export function Dashboard() {
             <div className="min-w-0">
               <p className="font-semibold truncate">{auth.username}</p>
               <p className="text-xs text-muted-foreground">
-                {auth.discord_id ? `Discord • ${auth.discord_id}` : "Discord"}
-                {auth.linked_since ? ` • Linked ${auth.linked_since}` : ""}
+                Discord
               </p>
             </div>
           </div>

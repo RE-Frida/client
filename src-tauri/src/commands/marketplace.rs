@@ -76,3 +76,21 @@ pub async fn download_script(
 
     Ok(())
 }
+
+#[tauri::command]
+pub async fn get_tags(
+    state: State<'_, AppState>,
+) -> Result<TagsData, String> {
+    let ws_guard = state.ws.read().await;
+    let ws = ws_guard.as_ref().ok_or("Not connected to server")?;
+    let token = state.auth.lock().unwrap().token.clone();
+
+    let resp = ws.send_request(Action::GetTags, None, token).await?;
+
+    if !resp.ok {
+        return Err(resp.error.unwrap_or_else(|| "Failed to get tags".to_string()));
+    }
+
+    serde_json::from_value(resp.data.ok_or("No tags data")?)
+        .map_err(|e| format!("Invalid tags data: {}", e))
+}

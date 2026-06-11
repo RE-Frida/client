@@ -16,8 +16,9 @@ import {
   listProjectFiles, getProjectFile, getAuthState,
   isProjectInstalled, getProjectDiff, updateProjectFromServer,
   getProjectInstallPath, publishProject, openFolder, updateProject,
+  getTags,
 } from "@/hooks/tauri";
-import type { ProjectData, AuthState } from "@/types";
+import type { ProjectData, AuthState, TagVersion } from "@/types";
 
 const CATEGORIES = ["All", "Tools", "Games", "Security", "Utilities", "Other"];
 
@@ -45,6 +46,7 @@ export function Marketplace() {
   const [diffMap, setDiffMap] = useState<Map<string, boolean>>(new Map());
   const [downloadTarget, setDownloadTarget] = useState<ProjectData | null>(null);
   const [showDownloadWarning, setShowDownloadWarning] = useState(false);
+  const [gameVersions, setGameVersions] = useState<TagVersion[]>([]);
 
   // Detail page state
   const [viewProject, setViewProject] = useState<ProjectData | null>(null);
@@ -99,6 +101,7 @@ export function Marketplace() {
 
   useEffect(() => {
     getAuthState().then(setAuth).catch(() => {});
+    getTags().then(t => setGameVersions(t.game_versions)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -806,11 +809,16 @@ export function Marketplace() {
                   <Gamepad2 className="h-3.5 w-3.5" />
                   <span>Brawl Stars Version</span>
                 </label>
-                <Input
-                  placeholder="e.g. v67"
+                <select
                   value={createGameVersion}
                   onChange={(e) => setCreateGameVersion(e.target.value)}
-                />
+                  className="w-full"
+                >
+                  <option value="">Select version</option>
+                  {gameVersions.map((v) => (
+                    <option key={v.id} value={v.id}>{v.label}</option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium flex items-center gap-2">
@@ -934,11 +942,16 @@ export function Marketplace() {
                   <Gamepad2 className="h-3.5 w-3.5" />
                   <span>Brawl Stars Version</span>
                 </label>
-                <Input
-                  placeholder="e.g. v67"
+                <select
                   value={editGameVersion}
                   onChange={(e) => setEditGameVersion(e.target.value)}
-                />
+                  className="w-full"
+                >
+                  <option value="">Select version</option>
+                  {gameVersions.map((v) => (
+                    <option key={v.id} value={v.id}>{v.label}</option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium flex items-center gap-2">

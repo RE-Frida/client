@@ -161,6 +161,7 @@ pub fn run() {
             commands::marketplace::list_scripts,
             commands::marketplace::vote_script,
             commands::marketplace::download_script,
+            commands::marketplace::get_tags,
             commands::projects::list_projects,
             commands::projects::get_project,
             commands::projects::create_project,

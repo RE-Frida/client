@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readDir, readTextFile, writeTextFile, exists, mkdir } from "@tauri-apps/plugin-fs";
 import { join, homeDir, dirname } from "@tauri-apps/api/path";
-import type { DeviceInfo, AppConfig, AuthState, ScriptData, ProjectData } from "@/types";
+import type { DeviceInfo, AppConfig, AuthState, ScriptData, ProjectData, TagsData } from "@/types";
 
 // ─── ADB ────────────────────────────────────────────────────────
 
@@ -115,6 +115,10 @@ export async function voteScript(
 
 export async function downloadScript(scriptId: string): Promise<void> {
   return invoke("download_script", { scriptId });
+}
+
+export async function getTags(): Promise<TagsData> {
+  return invoke("get_tags");
 }
 
 // ─── Connection ──────────────────────────────────────────────────

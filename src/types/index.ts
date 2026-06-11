@@ -62,4 +62,26 @@ export interface AuthState {
   linked_since: string | null;
 }
 
+export interface TagCategory {
+  id: string;
+  label: string;
+  description: string;
+}
+
+export interface TagGame {
+  id: string;
+  label: string;
+}
+
+export interface TagVersion {
+  id: string;
+  label: string;
+}
+
+export interface TagsData {
+  categories: TagCategory[];
+  games: TagGame[];
+  game_versions: TagVersion[];
+}
+
 export type TabId = "dashboard" | "injection" | "adb" | "marketplace" | "logs" | "settings";

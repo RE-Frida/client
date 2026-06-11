@@ -142,7 +142,7 @@ export function Sidebar({
               </span>
               <span className="hidden truncate text-[10px] text-sidebar-foreground/60 group-hover/account:block">
                 <Disc className="mr-1 inline h-2.5 w-2.5" />
-                {auth.discord_id ? `ID: ${auth.discord_id}` : "Discord"}
+                Discord
               </span>
               <button
                 onClick={() => setShowLogoutConfirm(true)}
