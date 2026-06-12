@@ -3,8 +3,8 @@ members = ["src-tauri", "protocol"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.6"
-edition = "2021"
+version = "0.1.53"
+edition = "2026"
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
