@@ -69,3 +69,31 @@ pub struct AuthState {
     pub discord_id: Option<String>,
     pub linked_since: Option<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn auth_state_defaults_to_unauthenticated() {
+        let state = AuthState {
+            authenticated: false,
+            username: None,
+            avatar_url: None,
+            token: None,
+            discord_id: None,
+            linked_since: None,
+        };
+        assert!(!state.authenticated);
+        assert!(state.username.is_none());
+        assert!(state.token.is_none());
+    }
+
+    #[test]
+    fn app_config_default_settings_are_dark_theme() {
+        let config = AppConfig::default();
+        assert_eq!(config.settings.theme, "dark");
+        assert_eq!(config.settings.accent_color, Some("#ef6456".to_string()));
+        assert!(config.auth.token.is_none());
+    }
+}
