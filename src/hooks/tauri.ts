@@ -436,6 +436,14 @@ export async function adbListFiles(deviceId: string, path: string): Promise<stri
   return invoke("adb_list_files", { deviceId, path });
 }
 
+export async function adbConnect(address: string): Promise<string> {
+  return invoke("adb_connect", { address });
+}
+
+export async function adbDisconnect(address: string): Promise<string> {
+  return invoke("adb_disconnect", { address });
+}
+
 // ─── File System ─────────────────────────────────────────────────
 
 export async function openFolder(path: string): Promise<void> {

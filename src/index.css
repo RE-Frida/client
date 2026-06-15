@@ -358,7 +358,7 @@
     @apply bg-card text-foreground;
   }
 
-  input, textarea, [contenteditable], .cm-content, .cm-editor, .selectable {
+  input, textarea, [contenteditable], .cm-content, .cm-editor, .selectable, pre {
     user-select: text;
     -webkit-user-select: text;
   }

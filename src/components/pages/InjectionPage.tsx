@@ -50,7 +50,11 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
     try {
       const devs = await discoverDevices();
       setDevices(devs);
-      if (devs.length > 0 && !selectedDevice) {
+      if (devs.length === 0) {
+        onDeviceChange(null);
+      } else if (selectedDevice && !devs.find(d => d.id === selectedDevice)) {
+        onDeviceChange(devs[0].id);
+      } else if (!selectedDevice && devs.length > 0) {
         onDeviceChange(devs[0].id);
       }
     } catch (e) {

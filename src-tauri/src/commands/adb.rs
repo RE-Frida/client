@@ -524,3 +524,47 @@ pub async fn adb_list_files(
     }
     Ok(result)
 }
+
+#[tauri::command]
+pub async fn adb_connect(
+    state: State<'_, AppState>,
+    address: String,
+) -> Result<String, String> {
+    let output = adb_cmd(&state.adb_path)
+        .arg("connect")
+        .arg(&address)
+        .output()
+        .map_err(|e| format!("adb connect failed: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let mut result = stdout;
+    if !stderr.is_empty() {
+        if !result.is_empty() { result.push('\n'); }
+        result.push_str(&stderr);
+    }
+    state.add_log(format!("ADB connect {}: {}", address, result.trim()));
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn adb_disconnect(
+    state: State<'_, AppState>,
+    address: String,
+) -> Result<String, String> {
+    let output = adb_cmd(&state.adb_path)
+        .arg("disconnect")
+        .arg(&address)
+        .output()
+        .map_err(|e| format!("adb disconnect failed: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let mut result = stdout;
+    if !stderr.is_empty() {
+        if !result.is_empty() { result.push('\n'); }
+        result.push_str(&stderr);
+    }
+    state.add_log(format!("ADB disconnect {}: {}", address, result.trim()));
+    Ok(result)
+}

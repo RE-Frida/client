@@ -3,12 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Shell, ScrollText, RotateCcw, Package, FolderOpen,
-  Loader2, Smartphone, RefreshCw,
+  Loader2, Smartphone, RefreshCw, Copy, Check, Wifi,
 } from "lucide-react";
 import {
   adbShell, adbLogcat, adbReboot,
   adbInstall, adbUninstall, adbListFiles,
-  discoverDevices,
+  discoverDevices, adbConnect,
 } from "@/hooks/tauri";
 
 interface AdbPageProps {
@@ -26,7 +26,11 @@ export function AdbPage({ selectedDevice, onDeviceChange }: AdbPageProps) {
     try {
       const list = await discoverDevices();
       setDevices(list);
-      if (list.length === 1 && !selectedDevice) {
+      if (list.length === 0) {
+        onDeviceChange(null);
+      } else if (selectedDevice && !list.find(d => d.id === selectedDevice)) {
+        onDeviceChange(list[0].id);
+      } else if (!selectedDevice && list.length > 0) {
         onDeviceChange(list[0].id);
       }
     } catch (e) {
@@ -56,6 +60,21 @@ export function AdbPage({ selectedDevice, onDeviceChange }: AdbPageProps) {
   const [filePath, setFilePath] = useState("/sdcard");
   const [fileOutput, setFileOutput] = useState("");
   const [fileLoading, setFileLoading] = useState(false);
+  const [copiedSection, setCopiedSection] = useState<string | null>(null);
+
+  const [wirelessAddr, setWirelessAddr] = useState("");
+  const [connecting, setConnecting] = useState(false);
+  const [connectResult, setConnectResult] = useState("");
+
+  const copyToClipboard = async (text: string, section: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedSection(section);
+      setTimeout(() => setCopiedSection(null), 1500);
+    } catch (e) {
+      console.error("Copy failed:", e);
+    }
+  };
 
   const runShell = async () => {
     if (!selectedDevice || !shellCmd.trim()) return;
@@ -139,6 +158,21 @@ export function AdbPage({ selectedDevice, onDeviceChange }: AdbPageProps) {
   const sectionClass = "rounded-lg border border-border bg-card p-4";
   const sectionTitle = "mb-3 text-sm font-semibold flex items-center gap-2";
 
+  const handleConnect = async () => {
+    if (!wirelessAddr.trim()) return;
+    setConnecting(true);
+    setConnectResult("");
+    try {
+      const result = await adbConnect(wirelessAddr.trim());
+      setConnectResult(result);
+      await refreshDevices();
+    } catch (e) {
+      setConnectResult(String(e));
+    } finally {
+      setConnecting(false);
+    }
+  };
+
   return (
     <div className="flex h-full flex-col p-4">
       {/* Device toolbar */}
@@ -162,6 +196,24 @@ export function AdbPage({ selectedDevice, onDeviceChange }: AdbPageProps) {
         <Button variant="ghost" size="sm" onClick={refreshDevices} disabled={refreshing} className="h-7 px-1.5">
           <RefreshCw className={"h-3 w-3" + (refreshing ? " animate-spin" : "")} />
         </Button>
+        <div className="text-xs text-muted-foreground/50 shrink-0">|</div>
+        <Wifi className="h-4 w-4 text-muted-foreground shrink-0" />
+        <Input
+          placeholder="ip:port (e.g. 192.168.1.50:5555)"
+          value={wirelessAddr}
+          onChange={(e) => setWirelessAddr(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleConnect()}
+          className="w-52 text-xs"
+        />
+        <Button size="sm" onClick={handleConnect} disabled={connecting || !wirelessAddr.trim()} className="h-7 text-xs">
+          {connecting ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+          Connect
+        </Button>
+        {connectResult && (
+          <span className={"text-[10px] truncate max-w-40 " + (connectResult.includes("connected") ? "text-green-500" : "text-muted-foreground")}>
+            {connectResult.trim()}
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 overflow-auto pb-4">
@@ -182,9 +234,20 @@ export function AdbPage({ selectedDevice, onDeviceChange }: AdbPageProps) {
             </Button>
           </div>
           {shellOutput && (
-            <pre className="max-h-48 overflow-auto rounded bg-background p-2 text-[11px] font-mono whitespace-pre-wrap text-muted-foreground">
-              {shellOutput}
-            </pre>
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => copyToClipboard(shellOutput, "shell")}
+                className="absolute top-1 right-1 h-6 w-6 p-0 opacity-60 hover:opacity-100"
+                title="Copy output"
+              >
+                {copiedSection === "shell" ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+              </Button>
+              <pre className="max-h-48 overflow-auto rounded bg-background p-2 text-[11px] font-mono whitespace-pre-wrap text-muted-foreground">
+                {shellOutput}
+              </pre>
+            </div>
           )}
         </div>
 
@@ -211,9 +274,20 @@ export function AdbPage({ selectedDevice, onDeviceChange }: AdbPageProps) {
             </Button>
           </div>
           {logOutput && (
-            <pre className="max-h-48 overflow-auto rounded bg-background p-2 text-[11px] font-mono whitespace-pre-wrap text-muted-foreground">
-              {logOutput}
-            </pre>
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => copyToClipboard(logOutput, "logcat")}
+                className="absolute top-1 right-1 h-6 w-6 p-0 opacity-60 hover:opacity-100"
+                title="Copy output"
+              >
+                {copiedSection === "logcat" ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+              </Button>
+              <pre className="max-h-48 overflow-auto rounded bg-background p-2 text-[11px] font-mono whitespace-pre-wrap text-muted-foreground">
+                {logOutput}
+              </pre>
+            </div>
           )}
         </div>
 
@@ -283,9 +357,20 @@ export function AdbPage({ selectedDevice, onDeviceChange }: AdbPageProps) {
             </Button>
           </div>
           {fileOutput && (
-            <pre className="max-h-48 overflow-auto rounded bg-background p-2 text-[11px] font-mono whitespace-pre-wrap text-muted-foreground">
-              {fileOutput}
-            </pre>
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => copyToClipboard(fileOutput, "files")}
+                className="absolute top-1 right-1 h-6 w-6 p-0 opacity-60 hover:opacity-100"
+                title="Copy output"
+              >
+                {copiedSection === "files" ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+              </Button>
+              <pre className="max-h-48 overflow-auto rounded bg-background p-2 text-[11px] font-mono whitespace-pre-wrap text-muted-foreground">
+                {fileOutput}
+              </pre>
+            </div>
           )}
         </div>
       </div>

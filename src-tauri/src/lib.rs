@@ -151,6 +151,8 @@ pub fn run() {
             commands::adb::adb_install,
             commands::adb::adb_uninstall,
             commands::adb::adb_list_files,
+            commands::adb::adb_connect,
+            commands::adb::adb_disconnect,
             commands::logs::get_logs,
             commands::logs::clear_logs,
             commands::config::get_config,
