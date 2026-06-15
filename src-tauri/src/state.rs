@@ -110,9 +110,9 @@ impl AppState {
         dbg_log!("ADB path: {}", adb_path);
         dbg_log!("Frida path: {}", frida_path);
 
-        // Load saved auth token from config
+        // Start unauthenticated — connect_ws() restores full profile before setting true
         let auth = AuthState {
-            authenticated: config.auth.token.is_some(),
+            authenticated: false,
             username: None,
             avatar_url: None,
             token: config.auth.token.clone(),
