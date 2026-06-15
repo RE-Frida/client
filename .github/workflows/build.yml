@@ -11,7 +11,7 @@ concurrency:
 jobs:
   version:
     if: github.actor != 'github-actions[bot]'
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     outputs:
       new: ${{ steps.bump.outputs.new }}
       tag: ${{ steps.bump.outputs.tag }}
@@ -53,32 +53,32 @@ jobs:
 
   build:
     needs: [version]
-    name: Build (${{ matrix.os }}, ${{ matrix.profile }})
-    runs-on: ${{ matrix.os }}
+    name: Build (${{ matrix.target }}, ${{ matrix.profile }})
+    runs-on: self-hosted
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
+          - target: x86_64-unknown-linux-gnu
             artifact: re-frida-linux-amd64
             profile: release
             features: ""
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
+            cross: false
+          - target: x86_64-unknown-linux-gnu
             artifact: re-frida-linux-amd64-debug
             profile: debug
             features: "--features debug"
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
+            cross: false
+          - target: x86_64-pc-windows-gnu
             artifact: re-frida-windows-amd64
             profile: release
             features: ""
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
+            cross: true
+          - target: x86_64-pc-windows-gnu
             artifact: re-frida-windows-amd64-debug
             profile: debug
             features: "--features debug"
+            cross: true
 
     steps:
       - uses: actions/checkout@v4
@@ -96,8 +96,7 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install Linux dependencies
-        if: runner.os == 'Linux'
+      - name: Install Linux build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -109,15 +108,22 @@ jobs:
             libssl-dev \
             xz-utils
 
+      - name: Install Windows cross-compilation toolchain
+        if: matrix.cross
+        run: |
+          sudo apt-get install -y \
+            gcc-mingw-w64-x86-64 \
+            g++-mingw-w64-x86-64
+
       - name: Cache tools
         id: cache-tools
         uses: actions/cache@v4
         with:
           path: src-tauri/tools
-          key: tools-${{ runner.os }}-${{ matrix.target }}-frida16
+          key: tools-linux-${{ matrix.target }}-frida16
 
-      - name: Download ADB + frida (Linux)
-        if: runner.os == 'Linux' && steps.cache-tools.outputs.cache-hit != 'true'
+      - name: Download ADB + frida (Linux native)
+        if: "!matrix.cross && steps.cache-tools.outputs.cache-hit != 'true'"
         run: |
           TRIPLE="${{ matrix.target }}"
           mkdir -p src-tauri/tools
@@ -136,27 +142,25 @@ jobs:
           mv frida-inject "frida-inject-${TRIPLE}"
           chmod +x "frida-inject-${TRIPLE}"
 
-      - name: Download ADB + frida (Windows)
-        if: runner.os == 'Windows' && steps.cache-tools.outputs.cache-hit != 'true'
-        shell: pwsh
+      - name: Download ADB + frida (Windows cross)
+        if: matrix.cross && steps.cache-tools.outputs.cache-hit != 'true'
         run: |
-          $triple = "${{ matrix.target }}"
-          New-Item -ItemType Directory -Force -Path src-tauri/tools
+          TRIPLE="${{ matrix.target }}"
+          mkdir -p src-tauri/tools
           cd src-tauri/tools
-          Invoke-WebRequest -Uri "https://dl.google.com/android/repository/platform-tools-latest-windows.zip" -OutFile pt.zip
-          Expand-Archive -Path pt.zip -DestinationPath . -Force
-          Copy-Item platform-tools/adb.exe "adb-${triple}.exe"
-          Copy-Item platform-tools/AdbWinApi.dll ./AdbWinApi.dll -ErrorAction SilentlyContinue
-          Copy-Item platform-tools/AdbWinUsbApi.dll ./AdbWinUsbApi.dll -ErrorAction SilentlyContinue
-          Remove-Item -Recurse -Force platform-tools, pt.zip
-          $apiResp = Invoke-RestMethod -Uri "https://api.github.com/repos/frida/frida/releases/latest"
-          $fridaTag = $apiResp.tag_name
-          $fridaVer = $fridaTag -replace '^v',''
-          Write-Host "Downloading frida-inject v${fridaVer}"
-          $baseUrl = "https://github.com/frida/frida/releases/download/${fridaTag}"
-          & curl.exe -sL -o "frida-inject.exe.xz" "${baseUrl}/frida-inject-${fridaVer}-windows-x86_64.exe.xz"
-          & xz -df "frida-inject.exe.xz"
-          Rename-Item "frida-inject.exe" "frida-inject-${triple}.exe"
+          curl -sL "https://dl.google.com/android/repository/platform-tools-latest-windows.zip" -o pt.zip
+          unzip -qo pt.zip
+          cp platform-tools/adb.exe "./adb-${TRIPLE}.exe"
+          cp platform-tools/AdbWinApi.dll ./AdbWinApi.dll 2>/dev/null || true
+          cp platform-tools/AdbWinUsbApi.dll ./AdbWinUsbApi.dll 2>/dev/null || true
+          rm -rf platform-tools pt.zip
+          FRIDA_TAG=$(curl -sLI -o /dev/null -w '%{url_effective}' "https://github.com/frida/frida/releases/latest" | xargs basename)
+          FRIDA_VER="${FRIDA_TAG#v}"
+          echo "Downloading frida-inject v${FRIDA_VER}"
+          BASE_URL="https://github.com/frida/frida/releases/download/${FRIDA_TAG}"
+          curl -sL "${BASE_URL}/frida-inject-${FRIDA_VER}-windows-x86_64.exe.xz" -o frida-inject.exe.xz
+          xz -df frida-inject.exe.xz
+          mv frida-inject.exe "frida-inject-${TRIPLE}.exe"
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -165,9 +169,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: tauri-${{ runner.os }}-${{ matrix.profile }}-cargo-${{ hashFiles('Cargo.lock', 'Cargo.toml', 'src-tauri/Cargo.toml', 'protocol/Cargo.toml') }}
+          key: tauri-linux-${{ matrix.target }}-${{ matrix.profile }}-cargo-${{ hashFiles('Cargo.lock', 'Cargo.toml', 'src-tauri/Cargo.toml', 'protocol/Cargo.toml') }}
           restore-keys: |
-            tauri-${{ runner.os }}-${{ matrix.profile }}-cargo-
+            tauri-linux-${{ matrix.target }}-${{ matrix.profile }}-cargo-
 
       - name: Install frontend dependencies
         run: npm ci
@@ -180,10 +184,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Rename binary
-        shell: bash
         run: |
           EXT=""
-          if [[ "${{ runner.os }}" == "Windows" ]]; then EXT=".exe"; fi
+          if [[ "${{ matrix.target }}" == *"windows"* ]]; then EXT=".exe"; fi
           mv target/${{ matrix.target }}/release/re-frida-tauri${EXT} \
              target/${{ matrix.target }}/release/${{ matrix.artifact }}${EXT}
 
@@ -195,7 +198,7 @@ jobs:
 
   release:
     needs: [version, build]
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     permissions:
       contents: write
 
