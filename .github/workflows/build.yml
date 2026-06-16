@@ -66,22 +66,6 @@ jobs:
             artifact: re-frida-linux-amd64
             profile: release
             features: ""
-            cross: false
-          # - target: x86_64-unknown-linux-gnu
-          #   artifact: re-frida-linux-amd64-debug
-          #   profile: debug
-          #   features: "--features debug"
-          #   cross: false
-          - target: x86_64-pc-windows-gnu
-            artifact: re-frida-windows-amd64
-            profile: release
-            features: ""
-            cross: true
-          # - target: x86_64-pc-windows-gnu
-          #   artifact: re-frida-windows-amd64-debug
-          #   profile: debug
-          #   features: "--features debug"
-          #   cross: true
 
     steps:
       - uses: actions/checkout@v4
@@ -112,13 +96,6 @@ jobs:
             libssl-dev \
             xz-utils
 
-      - name: Install Windows cross-compilation toolchain
-        if: matrix.cross
-        run: |
-          sudo apt-get install -y \
-            gcc-mingw-w64-x86-64 \
-            g++-mingw-w64-x86-64
-
       - name: Cache tools
         id: cache-tools
         uses: actions/cache@v4
@@ -126,8 +103,8 @@ jobs:
           path: src-tauri/tools
           key: tools-linux-${{ matrix.target }}-frida16
 
-      - name: Download ADB + frida (Linux native)
-        if: "!matrix.cross && steps.cache-tools.outputs.cache-hit != 'true'"
+      - name: Download ADB + frida
+        if: steps.cache-tools.outputs.cache-hit != 'true'
         run: |
           TRIPLE="${{ matrix.target }}"
           mkdir -p src-tauri/tools
@@ -145,26 +122,6 @@ jobs:
           xz -df frida-inject.xz
           mv frida-inject "frida-inject-${TRIPLE}"
           chmod +x "frida-inject-${TRIPLE}"
-
-      - name: Download ADB + frida (Windows cross)
-        if: matrix.cross && steps.cache-tools.outputs.cache-hit != 'true'
-        run: |
-          TRIPLE="${{ matrix.target }}"
-          mkdir -p src-tauri/tools
-          cd src-tauri/tools
-          curl -sL "https://dl.google.com/android/repository/platform-tools-latest-windows.zip" -o pt.zip
-          unzip -qo pt.zip
-          cp platform-tools/adb.exe "./adb-${TRIPLE}.exe"
-          cp platform-tools/AdbWinApi.dll ./AdbWinApi.dll 2>/dev/null || true
-          cp platform-tools/AdbWinUsbApi.dll ./AdbWinUsbApi.dll 2>/dev/null || true
-          rm -rf platform-tools pt.zip
-          FRIDA_TAG=$(curl -sLI -o /dev/null -w '%{url_effective}' "https://github.com/frida/frida/releases/latest" | xargs basename)
-          FRIDA_VER="${FRIDA_TAG#v}"
-          echo "Downloading frida-inject v${FRIDA_VER}"
-          BASE_URL="https://github.com/frida/frida/releases/download/${FRIDA_TAG}"
-          curl -sL "${BASE_URL}/frida-inject-${FRIDA_VER}-windows-x86_64.exe.xz" -o frida-inject.exe.xz
-          xz -df frida-inject.exe.xz
-          mv frida-inject.exe "frida-inject-${TRIPLE}.exe"
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -187,10 +144,8 @@ jobs:
 
       - name: Rename binary
         run: |
-          EXT=""
-          if [[ "${{ matrix.target }}" == *"windows"* ]]; then EXT=".exe"; fi
-          mv target/${{ matrix.target }}/release/re-frida-tauri${EXT} \
-             target/${{ matrix.target }}/release/${{ matrix.artifact }}${EXT}
+          mv target/${{ matrix.target }}/release/re-frida-tauri \
+             target/${{ matrix.target }}/release/${{ matrix.artifact }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
