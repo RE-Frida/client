@@ -556,9 +556,12 @@ pub async fn adb_disconnect(
     state: State<'_, AppState>,
     address: String,
 ) -> Result<String, String> {
-    let output = adb_cmd(&state.adb_path)
-        .arg("disconnect")
-        .arg(&address)
+    let mut cmd = adb_cmd(&state.adb_path);
+    cmd.arg("disconnect");
+    if !address.is_empty() {
+        cmd.arg(&address);
+    }
+    let output = cmd
         .output()
         .map_err(|e| format!("adb disconnect failed: {}", e))?;
 

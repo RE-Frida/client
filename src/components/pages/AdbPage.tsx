@@ -5,11 +5,12 @@ import { open } from "@tauri-apps/plugin-dialog";
 import {
   Terminal, ScrollText, RotateCcw, Package, FolderOpen,
   Loader2, Smartphone, RefreshCw, Copy, Check, Wifi,
+  WifiOff, Search, X,
 } from "lucide-react";
 import {
   adbShell, adbLogcat, adbReboot,
   adbInstall, adbUninstall, adbListFiles,
-  adbConnect,
+  adbConnect, adbDisconnect, listPackages,
 } from "@/hooks/tauri";
 import type { DeviceInfo } from "@/types";
 
@@ -58,6 +59,12 @@ export function AdbPage({ selectedDevice, onDeviceChange, devices, onRefreshDevi
   const [wirelessAddr, setWirelessAddr] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [connectResult, setConnectResult] = useState("");
+  const [connectedAddr, setConnectedAddr] = useState<string | null>(null);
+
+  const [packages, setPackages] = useState<string[]>([]);
+  const [packageFilter, setPackageFilter] = useState("");
+  const [packagesLoading, setPackagesLoading] = useState(false);
+  const [showPackages, setShowPackages] = useState(false);
 
   const copyToClipboard = async (text: string, section: string) => {
     try {
@@ -168,11 +175,61 @@ export function AdbPage({ selectedDevice, onDeviceChange, devices, onRefreshDevi
     try {
       const result = await adbConnect(wirelessAddr.trim());
       setConnectResult(result);
+      if (result.toLowerCase().includes("connected to")) {
+        setConnectedAddr(wirelessAddr.trim());
+      }
       await onRefreshDevices();
     } catch (e) {
       setConnectResult(String(e));
     } finally {
       setConnecting(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!connectedAddr) return;
+    setConnecting(true);
+    try {
+      const result = await adbDisconnect(connectedAddr);
+      setConnectResult(result);
+      setConnectedAddr(null);
+      await onRefreshDevices();
+    } catch (e) {
+      setConnectResult(String(e));
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const handleDisconnectAll = async () => {
+    setConnecting(true);
+    try {
+      const result = await adbDisconnect("");
+      setConnectResult(result);
+      setConnectedAddr(null);
+      await onRefreshDevices();
+    } catch (e) {
+      setConnectResult(String(e));
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const loadPackages = async () => {
+    if (!selectedDevice) return;
+    if (showPackages) {
+      setShowPackages(false);
+      return;
+    }
+    setPackagesLoading(true);
+    try {
+      const pkgs = await listPackages(selectedDevice);
+      setPackages(pkgs.sort());
+      setShowPackages(true);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setPackagesLoading(false);
     }
   };
 
@@ -206,14 +263,23 @@ export function AdbPage({ selectedDevice, onDeviceChange, devices, onRefreshDevi
           value={wirelessAddr}
           onChange={(e) => setWirelessAddr(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleConnect()}
-          className="w-52 text-xs"
+          className="w-44 text-xs"
         />
         <Button size="sm" onClick={handleConnect} disabled={connecting || !wirelessAddr.trim()} className="h-7 text-xs">
           {connecting ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
           Connect
         </Button>
+        {connectedAddr ? (
+          <Button size="sm" variant="secondary" onClick={handleDisconnect} disabled={connecting} className="h-7 text-xs">
+            Disconnect
+          </Button>
+        ) : null}
+        <Button size="sm" variant="ghost" onClick={handleDisconnectAll} disabled={connecting} className="h-7 text-xs text-muted-foreground">
+          <WifiOff className="h-3 w-3 mr-1" />
+          All
+        </Button>
         {connectResult && (
-          <span className={"text-[10px] truncate max-w-40 " + (connectResult.includes("connected") ? "text-green-500" : "text-muted-foreground")}>
+          <span className={"text-[10px] truncate max-w-32 " + (connectResult.toLowerCase().includes("connected") ? "text-green-500" : "text-muted-foreground")}>
             {connectResult.trim()}
           </span>
         )}
@@ -313,7 +379,47 @@ export function AdbPage({ selectedDevice, onDeviceChange, devices, onRefreshDevi
 
         {/* Package Management */}
         <div className={sectionClass}>
-          <div className={sectionTitle}><Package className="h-4 w-4" /> Packages</div>
+          <div className="flex items-center justify-between mb-3">
+            <div className={sectionTitle}><Package className="h-4 w-4" /> Packages</div>
+            <Button size="sm" variant="outline" onClick={loadPackages} disabled={packagesLoading || !selectedDevice} className="h-7 text-xs">
+              {packagesLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Search className="h-3 w-3 mr-1" />}
+              {showPackages ? "Hide" : "List Installed"}
+            </Button>
+          </div>
+
+          {showPackages && (
+            <div className="mb-3 rounded border border-border bg-background">
+              <div className="flex items-center gap-2 border-b border-border px-2 py-1.5">
+                <Search className="h-3 w-3 text-muted-foreground shrink-0" />
+                <input
+                  placeholder="Filter packages..."
+                  value={packageFilter}
+                  onChange={(e) => setPackageFilter(e.target.value)}
+                  className="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+                  autoFocus
+                />
+                <span className="text-[10px] text-muted-foreground">{packages.length} total</span>
+              </div>
+              <div className="max-h-40 overflow-y-auto">
+                {packages
+                  .filter((p) => !packageFilter || p.toLowerCase().includes(packageFilter.toLowerCase()))
+                  .map((pkg) => (
+                    <button
+                      key={pkg}
+                      onClick={() => { setUninstallPkg(pkg); setShowPackages(false); }}
+                      className="w-full px-2 py-1 text-left text-[11px] font-mono text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors truncate"
+                      title={pkg}
+                    >
+                      {pkg}
+                    </button>
+                  ))}
+                {packages.filter((p) => !packageFilter || p.toLowerCase().includes(packageFilter.toLowerCase())).length === 0 && (
+                  <p className="px-2 py-3 text-[11px] text-muted-foreground text-center">No packages match filter</p>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <div className="flex gap-2 items-center">
               <span className="text-xs w-16 shrink-0">Install:</span>
