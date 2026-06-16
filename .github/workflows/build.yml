@@ -92,9 +92,10 @@ jobs:
           cache: npm
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+          channel: nightly
 
       - name: Install Linux build dependencies
         run: |
