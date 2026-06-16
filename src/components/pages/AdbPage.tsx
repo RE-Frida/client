@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Shell, ScrollText, RotateCcw, Package, FolderOpen,
+  Terminal, ScrollText, RotateCcw, Package, FolderOpen,
   Loader2, Smartphone, RefreshCw, Copy, Check, Wifi,
 } from "lucide-react";
 import {
@@ -219,7 +219,7 @@ export function AdbPage({ selectedDevice, onDeviceChange }: AdbPageProps) {
       <div className="grid grid-cols-1 gap-4 overflow-auto pb-4">
         {/* Shell */}
         <div className={sectionClass}>
-          <div className={sectionTitle}><Shell className="h-4 w-4" /> Shell</div>
+          <div className={sectionTitle}><Terminal className="h-4 w-4" /> Shell</div>
           <div className="flex gap-2 mb-2">
             <Input
               placeholder="Enter command (e.g. getprop ro.build.version.sdk)"

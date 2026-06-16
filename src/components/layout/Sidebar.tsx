@@ -10,7 +10,6 @@ import {
   PanelLeftOpen,
   PanelLeftClose,
   Terminal,
-  Disc,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -137,12 +136,8 @@ export function Sidebar({
           </div>
           {!collapsed && (
             <div className="flex flex-1 min-w-0 items-center gap-1">
-              <span className="truncate text-xs font-medium text-sidebar-foreground group-hover/account:hidden">
+              <span className="truncate text-xs font-medium text-sidebar-foreground">
                 {auth.username}
-              </span>
-              <span className="hidden truncate text-[10px] text-sidebar-foreground/60 group-hover/account:block">
-                <Disc className="mr-1 inline h-2.5 w-2.5" />
-                Discord
               </span>
               <button
                 onClick={() => setShowLogoutConfirm(true)}
