@@ -178,9 +178,7 @@ jobs:
         run: npm ci
 
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
-        with:
-          args: --target ${{ matrix.target }} ${{ matrix.features }} --no-bundle
+        run: npx @tauri-apps/cli@latest build --target ${{ matrix.target }} ${{ matrix.features }} --no-bundle
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
