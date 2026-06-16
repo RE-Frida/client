@@ -45,5 +45,17 @@ fn main() {
             .expect("Failed to write stub");
     }
 
+    // Delay-load WebView2Loader.dll so the binary starts without it at runtime
+    // (Windows-only — embedded by build.rs, extracted by ensure_webview2_loader).
+    // The --delay-load flag converts the static PE import into a lazy one resolved
+    // on first function call, and -ldelayimp provides __delayLoadHelper2.
+    // This is the key fix: without it, Windows tries to resolve the DLL before
+    // main() runs and our extraction hasn't happened yet.
+    let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    if target_os == "windows" {
+        println!("cargo:rustc-link-arg=-Wl,--delay-load,webview2loader.dll");
+        println!("cargo:rustc-link-arg=-ldelayimp");
+    }
+
     tauri_build::build();
 }

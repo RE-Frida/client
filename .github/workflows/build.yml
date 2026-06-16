@@ -194,6 +194,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Verify delay-load import (Windows only)
+        if: matrix.cross
+        run: |
+          pip install pefile -q
+          python3 src-tauri/tools/verify_pe.py \
+            target/${{ matrix.target }}/release/${{ matrix.artifact }}.exe
+
       - name: Rename binary
         run: |
           EXT=""
