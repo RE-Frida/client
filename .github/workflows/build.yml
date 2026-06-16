@@ -187,6 +187,23 @@ jobs:
           unzip -qo webview2.nupkg -d webview2-temp
           cp webview2-temp/build/native/x64/WebView2Loader.dll \
              src-tauri/WebView2Loader.dll
+          # Generate delay-import library so the linker creates delay-load stubs
+          # instead of a static import. This avoids the need for --delayload
+          # which the runner's MinGW ld doesn't support.
+          mkdir -p src-tauri/delaylib
+          cat > src-tauri/delaylib/webview2.def << 'DEFEOF'
+          LIBRARY WebView2Loader.dll
+          EXPORTS
+            CompareBrowserVersions
+            CreateCoreWebView2Environment
+            CreateCoreWebView2EnvironmentWithOptions
+            GetAvailableCoreWebView2BrowserVersionString
+            GetAvailableCoreWebView2BrowserVersionStringWithOptions
+          DEFEOF
+          x86_64-w64-mingw32-dlltool \
+            -y src-tauri/delaylib/libWebView2Loader.dll.a \
+            -d src-tauri/delaylib/webview2.def \
+            -k
           rm -rf webview2.nupkg webview2-temp
 
       - name: Build Tauri app
@@ -201,29 +218,11 @@ jobs:
           mv target/${{ matrix.target }}/release/re-frida-tauri${EXT} \
              target/${{ matrix.target }}/release/${{ matrix.artifact }}${EXT}
 
-      - name: Bundle release archive (Windows)
-        if: matrix.cross
-        run: |
-          cp src-tauri/WebView2Loader.dll target/${{ matrix.target }}/release/
-          cd target/${{ matrix.target }}/release/
-          zip -9 "${{ matrix.artifact }}.zip" \
-            "${{ matrix.artifact }}.exe" \
-            "WebView2Loader.dll"
-          echo "Created ${{ matrix.artifact }}.zip with exe + WebView2Loader.dll"
-
-      - name: Upload artifact (Linux)
-        if: "!matrix.cross"
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: target/${{ matrix.target }}/release/${{ matrix.artifact }}
-
-      - name: Upload artifact (Windows zip)
-        if: matrix.cross
-        uses: actions/upload-artifact@v4
-        with:
-          name: re-frida-windows-amd64
-          path: target/${{ matrix.target }}/release/${{ matrix.artifact }}.zip
+          path: target/${{ matrix.target }}/release/${{ matrix.artifact }}*
 
   release:
     needs: [version, build]
