@@ -8,6 +8,9 @@ on:
 concurrency:
   group: client-build
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   version:
     if: github.actor != 'github-actions[bot]'
@@ -95,7 +98,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-          channel: nightly
+          toolchain: nightly
 
       - name: Install Linux build dependencies
         run: |
