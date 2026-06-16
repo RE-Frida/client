@@ -19,32 +19,6 @@ async fn open_folder(path: String) -> Result<(), String> {
     open::that(&path).map_err(|e| format!("Failed to open folder: {}", e))
 }
 
-// ─── WebView2 Loader ────────────────────────────────────────────
-
-/// Extracts the embedded WebView2Loader.dll next to the executable
-/// so Tauri's WebView2 runtime can load it at startup.
-/// Only needed on Windows when the DLL is not installed system-wide.
-#[cfg(target_os = "windows")]
-fn ensure_webview2_loader() {
-    let bytes = embedded::WEBVIEW2_LOADER_DLL;
-    if bytes.is_empty() {
-        return;
-    }
-    if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(exe_dir) = exe_path.parent() {
-            let dll_path = exe_dir.join("WebView2Loader.dll");
-            if !dll_path.exists() {
-                let _ = std::fs::write(&dll_path, bytes);
-            }
-        }
-    }
-}
-
-#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
-mod embedded {
-    include!(concat!(env!("OUT_DIR"), "/webview2_embedded.rs"));
-}
-
 // ─── Connection Status ──────────────────────────────────────────
 
 #[tauri::command]
@@ -103,9 +77,6 @@ async fn get_security_report() -> Result<String, String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    #[cfg(target_os = "windows")]
-    ensure_webview2_loader();
-
     #[cfg(feature = "debug")]
     {
         env_logger::init();

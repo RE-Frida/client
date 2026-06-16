@@ -194,19 +194,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Verify delay-load import (Windows only)
-        if: matrix.cross
-        run: |
-          pip install pefile -q
-          python3 src-tauri/tools/verify_pe.py \
-            target/${{ matrix.target }}/release/${{ matrix.artifact }}.exe
-
       - name: Rename binary
         run: |
           EXT=""
           if [[ "${{ matrix.target }}" == *"windows"* ]]; then EXT=".exe"; fi
           mv target/${{ matrix.target }}/release/re-frida-tauri${EXT} \
              target/${{ matrix.target }}/release/${{ matrix.artifact }}${EXT}
+
+      - name: Bundle WebView2Loader.dll (Windows)
+        if: matrix.cross
+        run: |
+          cp src-tauri/WebView2Loader.dll \
+             target/${{ matrix.target }}/release/
+          echo "WebView2Loader.dll bundled alongside exe"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
