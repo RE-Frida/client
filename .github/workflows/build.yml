@@ -180,6 +180,15 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Download WebView2Loader.dll for embedding (Windows)
+        if: matrix.cross
+        run: |
+          curl -sL "https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/1.0.2739.15" -o webview2.nupkg
+          unzip -qo webview2.nupkg -d webview2-temp
+          cp webview2-temp/build/native/x64/WebView2Loader.dll \
+             src-tauri/WebView2Loader.dll
+          rm -rf webview2.nupkg webview2-temp
+
       - name: Build Tauri app
         run: npx @tauri-apps/cli@latest build --target ${{ matrix.target }} ${{ matrix.features }} --no-bundle
         env:
@@ -191,15 +200,6 @@ jobs:
           if [[ "${{ matrix.target }}" == *"windows"* ]]; then EXT=".exe"; fi
           mv target/${{ matrix.target }}/release/re-frida-tauri${EXT} \
              target/${{ matrix.target }}/release/${{ matrix.artifact }}${EXT}
-
-      - name: Download WebView2Loader.dll (Windows)
-        if: matrix.cross
-        run: |
-          curl -sL "https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/1.0.2739.15" -o webview2.nupkg
-          unzip -qo webview2.nupkg -d webview2-temp
-          cp webview2-temp/build/native/x64/WebView2Loader.dll \
-             target/${{ matrix.target }}/release/WebView2Loader.dll
-          rm -rf webview2.nupkg webview2-temp
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
