@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  getConfig, discoverDevices, startSession, executeScriptConsole,
+  getConfig, startSession, executeScriptConsole,
   stopFridaConsole, sendFridaInput, launchApp, killApp,
 } from "@/hooks/tauri";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -16,11 +16,12 @@ import type { DeviceInfo, AppConfig } from "@/types";
 interface InjectionPageProps {
   selectedDevice: string | null;
   onDeviceChange: (id: string | null) => void;
+  devices: DeviceInfo[];
+  onRefreshDevices: () => Promise<void>;
 }
 
-export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageProps) {
+export function InjectionPage({ selectedDevice, onDeviceChange, devices, onRefreshDevices }: InjectionPageProps) {
   const [config, setConfig] = useState<AppConfig | null>(null);
-  const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [scriptPath, setScriptPath] = useState<string | null>(null);
   const [output, setOutput] = useState("");
@@ -31,7 +32,7 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
 
   useEffect(() => {
     getConfig().then((c) => { setConfig(c); }).catch(() => {});
-    refreshDevices();
+    onRefreshDevices();
     return () => {
       if (unlistenRef.current) {
         unlistenRef.current();
@@ -45,20 +46,10 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
     }
   }, [output, inputBuffer]);
 
-  const refreshDevices = async () => {
+  const handleRefreshDevices = async () => {
     setRefreshing(true);
     try {
-      const devs = await discoverDevices();
-      setDevices(devs);
-      if (devs.length === 0) {
-        onDeviceChange(null);
-      } else if (selectedDevice && !devs.find(d => d.id === selectedDevice)) {
-        onDeviceChange(devs[0].id);
-      } else if (!selectedDevice && devs.length > 0) {
-        onDeviceChange(devs[0].id);
-      }
-    } catch (e) {
-      console.error("Device discovery failed:", e);
+      await onRefreshDevices();
     } finally {
       setRefreshing(false);
     }
@@ -105,7 +96,7 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
     try {
       await startListening();
       const name = scriptPath.split("/").pop() || "script.js";
-      setOutput(`❯ frida -D ${selectedDevice} -n Gadget -l ${name}\n`);
+      setOutput(`❯ frida -D ${selectedDevice} -n ${config?.settings.gadget_name || "Gadget"} -l ${name}\n`);
       setConsoleRunning(true);
       const result = await executeScriptConsole(selectedDevice, scriptPath);
       showToast(result, "success");
@@ -204,7 +195,7 @@ export function InjectionPage({ selectedDevice, onDeviceChange }: InjectionPageP
               ))
             )}
           </select>
-          <Button variant="ghost" size="sm" onClick={refreshDevices} disabled={refreshing} className="h-7 px-1.5">
+          <Button variant="ghost" size="sm" onClick={handleRefreshDevices} disabled={refreshing} className="h-7 px-1.5">
             <RefreshCw className={"h-3 w-3" + (refreshing ? " animate-spin" : "")} />
           </Button>
         </div>

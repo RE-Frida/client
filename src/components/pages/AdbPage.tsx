@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { open } from "@tauri-apps/plugin-dialog";
 import {
   Terminal, ScrollText, RotateCcw, Package, FolderOpen,
   Loader2, Smartphone, RefreshCw, Copy, Check, Wifi,
@@ -8,39 +9,31 @@ import {
 import {
   adbShell, adbLogcat, adbReboot,
   adbInstall, adbUninstall, adbListFiles,
-  discoverDevices, adbConnect,
+  adbConnect,
 } from "@/hooks/tauri";
+import type { DeviceInfo } from "@/types";
 
 interface AdbPageProps {
   selectedDevice: string | null;
   onDeviceChange: (device: string | null) => void;
+  devices: DeviceInfo[];
+  onRefreshDevices: () => Promise<void>;
 }
 
-export function AdbPage({ selectedDevice, onDeviceChange }: AdbPageProps) {
-  const [devices, setDevices] = useState<{ id: string; model: string | null; status: string }[]>([]);
+export function AdbPage({ selectedDevice, onDeviceChange, devices, onRefreshDevices }: AdbPageProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [shellCmd, setShellCmd] = useState("");
 
-  const refreshDevices = async () => {
+  const handleRefreshDevices = async () => {
     setRefreshing(true);
     try {
-      const list = await discoverDevices();
-      setDevices(list);
-      if (list.length === 0) {
-        onDeviceChange(null);
-      } else if (selectedDevice && !list.find(d => d.id === selectedDevice)) {
-        onDeviceChange(list[0].id);
-      } else if (!selectedDevice && list.length > 0) {
-        onDeviceChange(list[0].id);
-      }
-    } catch (e) {
-      console.error(e);
+      await onRefreshDevices();
     } finally {
       setRefreshing(false);
     }
   };
 
-  useEffect(() => { refreshDevices(); }, []);
+  useEffect(() => { handleRefreshDevices(); }, []);
   const [shellOutput, setShellOutput] = useState("");
   const [shelling, setShelling] = useState(false);
 
@@ -116,6 +109,16 @@ export function AdbPage({ selectedDevice, onDeviceChange }: AdbPageProps) {
     }
   };
 
+  const handleBrowseApk = async () => {
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: "APK", extensions: ["apk"] }],
+    });
+    if (selected) {
+      setApkPath(selected);
+    }
+  };
+
   const handleInstall = async () => {
     if (!selectedDevice || !apkPath.trim()) return;
     setInstalling(true);
@@ -165,7 +168,7 @@ export function AdbPage({ selectedDevice, onDeviceChange }: AdbPageProps) {
     try {
       const result = await adbConnect(wirelessAddr.trim());
       setConnectResult(result);
-      await refreshDevices();
+      await onRefreshDevices();
     } catch (e) {
       setConnectResult(String(e));
     } finally {
@@ -193,7 +196,7 @@ export function AdbPage({ selectedDevice, onDeviceChange }: AdbPageProps) {
             ))
           )}
         </select>
-        <Button variant="ghost" size="sm" onClick={refreshDevices} disabled={refreshing} className="h-7 px-1.5">
+        <Button variant="ghost" size="sm" onClick={handleRefreshDevices} disabled={refreshing} className="h-7 px-1.5">
           <RefreshCw className={"h-3 w-3" + (refreshing ? " animate-spin" : "")} />
         </Button>
         <div className="text-xs text-muted-foreground/50 shrink-0">|</div>
@@ -320,6 +323,9 @@ export function AdbPage({ selectedDevice, onDeviceChange }: AdbPageProps) {
                 onChange={(e) => setApkPath(e.target.value)}
                 className="flex-1 text-xs"
               />
+              <Button variant="outline" size="sm" onClick={handleBrowseApk} disabled={!selectedDevice} className="h-8 text-xs">
+                Browse
+              </Button>
               <Button size="sm" onClick={handleInstall} disabled={installing || !selectedDevice} className="h-8 text-xs">
                 {installing ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
                 Install

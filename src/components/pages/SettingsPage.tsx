@@ -11,7 +11,7 @@ import type { AppConfig } from "@/types";
 
 export function SettingsPage() {
   const [config, setConfig] = useState<AppConfig>({
-    settings: { theme: "dark", frida_port: 27042, custom_package: "org.refrida.apk", advanced_mode: false },
+    settings: { theme: "dark", frida_port: 27042, custom_package: "org.refrida.apk", advanced_mode: false, gadget_name: "Gadget" },
     auth: {},
   });
   const [saving, setSaving] = useState(false);
@@ -211,6 +211,21 @@ export function SettingsPage() {
                       })
                     }
                     placeholder="27042"
+                  />
+                </div>
+                <div className="mt-4">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Gadget Process Name
+                  </label>
+                  <Input
+                    value={config.settings.gadget_name || "Gadget"}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        settings: { ...config.settings, gadget_name: e.target.value },
+                      })
+                    }
+                    placeholder="Gadget"
                   />
                 </div>
               </CardContent>

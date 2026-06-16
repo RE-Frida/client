@@ -8,11 +8,11 @@ import { LogsPage } from "@/components/pages/LogsPage";
 import { Marketplace } from "@/components/pages/MarketplacePage";
 import { SettingsPage } from "@/components/pages/SettingsPage";
 import { LoginPage } from "@/components/pages/LoginPage";
-import { getAuthState, isConnected, getConfig, reconnect, getClientVersionError } from "@/hooks/tauri";
+import { getAuthState, isConnected, getConfig, reconnect, getClientVersionError, discoverDevices } from "@/hooks/tauri";
 import { applyTheme } from "@/lib/theme";
 import { subscribeToasts, dismissToast } from "@/lib/toast";
 import type { ToastItem } from "@/lib/toast";
-import type { TabId, AuthState } from "@/types";
+import type { TabId, AuthState, DeviceInfo } from "@/types";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>("dashboard");
@@ -21,8 +21,25 @@ export default function App() {
   const [connectionFailed, setConnectionFailed] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
+  const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [clientVersionError, setClientVersionError] = useState<string | null>(null);
+
+  const refreshDevices = useCallback(async () => {
+    try {
+      const list = await discoverDevices();
+      setDevices(list);
+      if (list.length === 0) {
+        setSelectedDevice(null);
+      } else if (selectedDevice && !list.find(d => d.id === selectedDevice)) {
+        setSelectedDevice(list[0].id);
+      } else if (!selectedDevice && list.length > 0) {
+        setSelectedDevice(list[0].id);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, [selectedDevice]);
 
   const pollAuth = useCallback(() => {
     getAuthState().then(setAuth).catch(() => {});
@@ -106,6 +123,8 @@ export default function App() {
             <InjectionPage
               selectedDevice={selectedDevice}
               onDeviceChange={setSelectedDevice}
+              devices={devices}
+              onRefreshDevices={refreshDevices}
             />
           </div>
           <div className={"h-full" + (activeTab === "marketplace" ? "" : " hidden")}>
@@ -115,6 +134,8 @@ export default function App() {
             <AdbPage
               selectedDevice={selectedDevice}
               onDeviceChange={setSelectedDevice}
+              devices={devices}
+              onRefreshDevices={refreshDevices}
             />
           </div>
           <div className={"h-full" + (activeTab === "logs" ? "" : " hidden")}>
