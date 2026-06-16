@@ -201,18 +201,29 @@ jobs:
           mv target/${{ matrix.target }}/release/re-frida-tauri${EXT} \
              target/${{ matrix.target }}/release/${{ matrix.artifact }}${EXT}
 
-      - name: Bundle WebView2Loader.dll (Windows)
+      - name: Bundle release archive (Windows)
         if: matrix.cross
         run: |
-          cp src-tauri/WebView2Loader.dll \
-             target/${{ matrix.target }}/release/
-          echo "WebView2Loader.dll bundled alongside exe"
+          cp src-tauri/WebView2Loader.dll target/${{ matrix.target }}/release/
+          cd target/${{ matrix.target }}/release/
+          zip -9 "${{ matrix.artifact }}.zip" \
+            "${{ matrix.artifact }}.exe" \
+            "WebView2Loader.dll"
+          echo "Created ${{ matrix.artifact }}.zip with exe + WebView2Loader.dll"
 
-      - name: Upload artifact
+      - name: Upload artifact (Linux)
+        if: "!matrix.cross"
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: target/${{ matrix.target }}/release/${{ matrix.artifact }}*
+          path: target/${{ matrix.target }}/release/${{ matrix.artifact }}
+
+      - name: Upload artifact (Windows zip)
+        if: matrix.cross
+        uses: actions/upload-artifact@v4
+        with:
+          name: re-frida-windows-amd64
+          path: target/${{ matrix.target }}/release/${{ matrix.artifact }}.zip
 
   release:
     needs: [version, build]
