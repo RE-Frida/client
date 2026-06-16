@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Smartphone, RefreshCw, Play, Square, Terminal,
-  FileCode2, Send, RotateCw,
+  FileCode2, Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,7 +10,6 @@ import {
 } from "@/hooks/tauri";
 import { open } from "@tauri-apps/plugin-dialog";
 import { listen } from "@tauri-apps/api/event";
-import { readTextFile } from "@tauri-apps/plugin-fs";
 import { showToast } from "@/lib/toast";
 import type { DeviceInfo, AppConfig } from "@/types";
 
@@ -28,10 +27,8 @@ export function InjectionPage({ selectedDevice, onDeviceChange, devices, onRefre
   const [output, setOutput] = useState("");
   const [inputBuffer, setInputBuffer] = useState("");
   const [consoleRunning, setConsoleRunning] = useState(false);
-  const [autoReload, setAutoReload] = useState(false);
   const outputRef = useRef<HTMLDivElement>(null);
   const unlistenRef = useRef<(() => void) | null>(null);
-  const lastContentRef = useRef<string | null>(null);
 
   useEffect(() => {
     getConfig().then((c) => { setConfig(c); }).catch(() => {});
@@ -48,48 +45,6 @@ export function InjectionPage({ selectedDevice, onDeviceChange, devices, onRefre
       outputRef.current.scrollTop = outputRef.current.scrollHeight;
     }
   }, [output, inputBuffer]);
-
-  // Auto-reload: poll script file for changes
-  useEffect(() => {
-    if (!autoReload || !consoleRunning || !scriptPath || !selectedDevice) return;
-
-    let cancelled = false;
-    lastContentRef.current = null;
-
-    const poll = async () => {
-      try {
-        const content = await readTextFile(scriptPath);
-        if (lastContentRef.current !== null && lastContentRef.current !== content) {
-          // File changed — debounce 400ms to let writes settle
-          await new Promise((r) => setTimeout(r, 400));
-          if (cancelled) return;
-          const content2 = await readTextFile(scriptPath);
-          if (content2 === content) {
-            lastContentRef.current = content;
-            setOutput((prev) => prev + "\n[Auto-reload] File changed, re-executing...\n");
-            try {
-              await startListening();
-              const name = scriptPath.split("/").pop() || "script.js";
-              setOutput(`❯ frida -D ${selectedDevice} -n ${config?.settings.gadget_name || "Gadget"} -l ${name}\n`);
-              setConsoleRunning(true);
-              await executeScriptConsole(selectedDevice, scriptPath);
-              showToast("Script auto-reloaded", "success");
-            } catch (e) {
-              setOutput((prev) => prev + "Auto-reload error: " + e + "\n");
-              showToast("Auto-reload failed: " + e, "error");
-            }
-          }
-        } else {
-          lastContentRef.current = content;
-        }
-      } catch {
-        // File may not be accessible during save — skip
-      }
-    };
-
-    const timer = setInterval(poll, 1500);
-    return () => { cancelled = true; clearInterval(timer); };
-  }, [autoReload, consoleRunning, scriptPath, selectedDevice, config]);
 
   const handleRefreshDevices = async () => {
     setRefreshing(true);
@@ -266,17 +221,6 @@ export function InjectionPage({ selectedDevice, onDeviceChange, devices, onRefre
           >
             <Play className="mr-1 h-3 w-3" />
             Start
-          </Button>
-          <Button
-            variant={autoReload ? "default" : "outline"}
-            size="sm"
-            onClick={() => setAutoReload(!autoReload)}
-            disabled={devices.length === 0 || !scriptPath}
-            className={"h-7 text-xs px-2" + (autoReload ? " border-green-500/40" : "")}
-            title="Auto-reload script when file changes"
-          >
-            <RotateCw className={"mr-1 h-3 w-3" + (autoReload ? " text-green-400" : "")} />
-            Auto
           </Button>
           <Button
             variant="default"

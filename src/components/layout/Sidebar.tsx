@@ -135,13 +135,13 @@ export function Sidebar({
             </div>
           </div>
           {!collapsed && (
-            <div className="flex flex-1 min-w-0 items-center gap-1">
+            <div className="flex flex-1 min-w-0 items-center">
               <span className="truncate text-xs font-medium text-sidebar-foreground">
                 {auth.username}
               </span>
               <button
                 onClick={() => setShowLogoutConfirm(true)}
-                className="rounded p-1 text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground shrink-0"
+                className="ml-auto rounded p-1 text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground shrink-0"
                 title="Logout"
               >
                 <LogOut className="h-3.5 w-3.5" />

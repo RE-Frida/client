@@ -274,9 +274,9 @@ export function AdbPage({ selectedDevice, onDeviceChange, devices, onRefreshDevi
             Disconnect
           </Button>
         ) : null}
-        <Button size="sm" variant="ghost" onClick={handleDisconnectAll} disabled={connecting} className="h-7 text-xs text-muted-foreground">
+        <Button size="sm" variant="ghost" onClick={handleDisconnectAll} disabled={connecting} className="h-7 text-xs">
           <WifiOff className="h-3 w-3 mr-1" />
-          All
+          Disconnect All
         </Button>
         {connectResult && (
           <span className={"text-[10px] truncate max-w-32 " + (connectResult.toLowerCase().includes("connected") ? "text-green-500" : "text-muted-foreground")}>
