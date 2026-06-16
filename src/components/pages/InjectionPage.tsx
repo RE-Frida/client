@@ -72,7 +72,7 @@ export function InjectionPage({ selectedDevice, onDeviceChange, devices, onRefre
               const name = scriptPath.split("/").pop() || "script.js";
               setOutput(`❯ frida -D ${selectedDevice} -n ${config?.settings.gadget_name || "Gadget"} -l ${name}\n`);
               setConsoleRunning(true);
-              const result = await executeScriptConsole(selectedDevice, scriptPath);
+              await executeScriptConsole(selectedDevice, scriptPath);
               showToast("Script auto-reloaded", "success");
             } catch (e) {
               setOutput((prev) => prev + "Auto-reload error: " + e + "\n");

@@ -5,7 +5,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import {
   Terminal, ScrollText, RotateCcw, Package, FolderOpen,
   Loader2, Smartphone, RefreshCw, Copy, Check, Wifi,
-  WifiOff, Search, X,
+  WifiOff, Search,
 } from "lucide-react";
 import {
   adbShell, adbLogcat, adbReboot,
