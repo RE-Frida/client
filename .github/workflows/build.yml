@@ -101,11 +101,20 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Install Rust toolchain
+      - name: Install Rust toolchain (Linux)
+        if: matrix.os == 'linux'
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
           toolchain: nightly
+
+      - name: Install Rust toolchain (Windows)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://win.rustup.rs/x86_64" -OutFile "$env:TEMP\rustup-init.exe"
+          & "$env:TEMP\rustup-init.exe" -y --default-toolchain nightly --default-host x86_64-pc-windows-msvc
+          echo "$env:USERPROFILE\.cargo\bin" >> $env:GITHUB_PATH
 
       - name: Install Linux build dependencies
         if: matrix.os == 'linux'
@@ -186,13 +195,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Rename binary
+      - name: Rename binary (Linux)
+        if: matrix.os == 'linux'
         shell: bash
         run: |
-          EXT=""
-          if [[ "${{ matrix.os }}" == "windows" ]]; then EXT=".exe"; fi
-          mv target/${{ matrix.target }}/release/re-frida-tauri${EXT} \
-             target/${{ matrix.target }}/release/${{ matrix.artifact }}${EXT}
+          mv target/${{ matrix.target }}/release/re-frida-tauri \
+             target/${{ matrix.target }}/release/${{ matrix.artifact }}
+
+      - name: Rename binary (Windows)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          Move-Item -Path "target/${{ matrix.target }}/release/re-frida-tauri.exe" `
+                    -Destination "target/${{ matrix.target }}/release/${{ matrix.artifact }}.exe"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
