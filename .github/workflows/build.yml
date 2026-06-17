@@ -14,7 +14,7 @@ env:
 jobs:
   version:
     if: github.actor != 'github-actions[bot]'
-    runs-on: self-hosted
+    runs-on: ${{ fromJson('["self-hosted", "Linux", "X64"]') }}
     outputs:
       new: ${{ steps.bump.outputs.new }}
       tag: ${{ steps.bump.outputs.tag }}
@@ -217,7 +217,7 @@ jobs:
 
   release:
     needs: [version, build]
-    runs-on: self-hosted
+    runs-on: ${{ fromJson('["self-hosted", "Linux", "X64"]') }}
     permissions:
       contents: write
 
