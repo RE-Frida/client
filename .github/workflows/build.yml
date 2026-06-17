@@ -156,6 +156,15 @@ jobs:
           mv frida-inject "frida-inject-${TRIPLE}"
           chmod +x "frida-inject-${TRIPLE}"
 
+      - name: Install 7-Zip (Windows)
+        if: matrix.os == 'windows'
+        shell: powershell
+        run: |
+          $msi = "$env:TEMP\7z.msi"
+          Invoke-WebRequest -UseBasicParsing -Uri "https://www.7-zip.org/a/7z2409-x64.msi" -OutFile $msi
+          Start-Process msiexec -Args "/i `"$msi`" /quiet /norestart" -Wait
+          echo "$env:ProgramFiles\7-Zip" >> $env:GITHUB_PATH
+
       - name: Download ADB + frida (Windows)
         if: matrix.os == 'windows' && steps.cache-tools.outputs.cache-hit != 'true'
         shell: powershell
@@ -178,20 +187,7 @@ jobs:
           Write-Host "Downloading frida-inject v${FRIDA_VER}"
           $BASE_URL = "https://github.com/frida/frida/releases/download/${FRIDA_TAG}"
           Invoke-WebRequest -UseBasicParsing -Uri "${BASE_URL}/frida-inject-${FRIDA_VER}-windows-x86_64.exe.xz" -OutFile frida-inject.exe.xz
-          # Find xz.exe from Git for Windows (usr\bin\xz.exe) or in PATH
-          $xzExe = Get-Command xz.exe -ErrorAction SilentlyContinue
-          if (-not $xzExe) {
-            $gitPath = (Get-Command git -ErrorAction SilentlyContinue).Source
-            if ($gitPath) {
-              $xzPath = Join-Path (Split-Path (Split-Path $gitPath)) "usr\bin\xz.exe"
-              if (Test-Path $xzPath) { $xzExe = Get-Command $xzPath }
-            }
-          }
-          if ($xzExe) {
-            & $xzExe -df frida-inject.exe.xz
-          } else {
-            throw "xz.exe not found. Install Git for Windows or 7-Zip on the runner."
-          }
+          & "C:\Program Files\7-Zip\7z.exe" e -y frida-inject.exe.xz -o"$pwd" 2>&1 | Out-Null
           Move-Item frida-inject.exe "frida-inject-${TRIPLE}.exe" -Force
 
       - name: Cache cargo
