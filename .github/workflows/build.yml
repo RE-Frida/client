@@ -60,30 +60,30 @@ jobs:
   build:
     needs: [version]
     name: Build (${{ matrix.artifact }}, ${{ matrix.profile }})
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ fromJson(matrix.runner) }}
     strategy:
       fail-fast: true
       matrix:
         include:
-          - runner: self-hosted, Linux
+          - runner: '["self-hosted", "Linux", "X64"]'
             target: x86_64-unknown-linux-gnu
             artifact: re-frida-linux-amd64
             profile: release
             features: ""
             os: linux
-          # - runner: self-hosted, Linux
+          # - runner: '["self-hosted", "Linux", "X64"]'
           #   target: x86_64-unknown-linux-gnu
           #   artifact: re-frida-linux-amd64-debug
           #   profile: debug
           #   features: "--features debug"
           #   os: linux
-          - runner: self-hosted, Windows
+          - runner: '["self-hosted", "Windows", "X64"]'
             target: x86_64-pc-windows-msvc
             artifact: re-frida-windows-amd64
             profile: release
             features: ""
             os: windows
-          # - runner: self-hosted, Windows
+          # - runner: '["self-hosted", "Windows", "X64"]'
           #   target: x86_64-pc-windows-msvc
           #   artifact: re-frida-windows-amd64-debug
           #   profile: debug
