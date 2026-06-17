@@ -156,16 +156,11 @@ jobs:
           mv frida-inject "frida-inject-${TRIPLE}"
           chmod +x "frida-inject-${TRIPLE}"
 
-      - name: Install 7-Zip (Windows)
+      - name: Setup Python (Windows)
         if: matrix.os == 'windows'
-        shell: powershell
-        run: |
-          $7zDir = "C:\tools\7z"
-          New-Item -ItemType Directory -Force -Path $7zDir | Out-Null
-          Invoke-WebRequest -UseBasicParsing -Uri "https://www.7-zip.org/a/7zr.exe" -OutFile "$7zDir\7zr.exe"
-          Invoke-WebRequest -UseBasicParsing -Uri "https://www.7-zip.org/a/7z2409-extra.7z" -OutFile "$7zDir\7z-extra.7z"
-          & "$7zDir\7zr.exe" x -o"$7zDir" -y "$7zDir\7z-extra.7z"
-          echo $7zDir >> $env:GITHUB_PATH
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
 
       - name: Download ADB + frida (Windows)
         if: matrix.os == 'windows' && steps.cache-tools.outputs.cache-hit != 'true'
@@ -189,7 +184,7 @@ jobs:
           Write-Host "Downloading frida-inject v${FRIDA_VER}"
           $BASE_URL = "https://github.com/frida/frida/releases/download/${FRIDA_TAG}"
           Invoke-WebRequest -UseBasicParsing -Uri "${BASE_URL}/frida-inject-${FRIDA_VER}-windows-x86_64.exe.xz" -OutFile frida-inject.exe.xz
-          & "C:\tools\7z\7z.exe" x -y frida-inject.exe.xz
+          python -c "import lzma,sys; open('frida-inject.exe','wb').write(lzma.decompress(open('frida-inject.exe.xz','rb').read()))"
           Remove-Item frida-inject.exe.xz
           Move-Item frida-inject.exe "frida-inject-${TRIPLE}.exe" -Force
 
