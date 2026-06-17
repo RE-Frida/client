@@ -112,7 +112,7 @@ jobs:
         if: matrix.os == 'windows'
         shell: powershell
         run: |
-          Invoke-WebRequest -Uri "https://win.rustup.rs/x86_64" -OutFile "$env:TEMP\rustup-init.exe"
+          Invoke-WebRequest -UseBasicParsing -Uri "https://win.rustup.rs/x86_64" -OutFile "$env:TEMP\rustup-init.exe"
           & "$env:TEMP\rustup-init.exe" -y --default-toolchain nightly --default-host x86_64-pc-windows-msvc
           echo "$env:USERPROFILE\.cargo\bin" >> $env:GITHUB_PATH
 
@@ -163,7 +163,7 @@ jobs:
           $TRIPLE = "${{ matrix.target }}"
           New-Item -ItemType Directory -Force -Path src-tauri/tools | Out-Null
           Set-Location src-tauri/tools
-          Invoke-WebRequest -Uri "https://dl.google.com/android/repository/platform-tools-latest-windows.zip" -OutFile pt.zip
+          Invoke-WebRequest -UseBasicParsing -Uri "https://dl.google.com/android/repository/platform-tools-latest-windows.zip" -OutFile pt.zip
           Expand-Archive -Path pt.zip -DestinationPath . -Force
           Copy-Item "platform-tools/adb.exe" "./adb-${TRIPLE}.exe" -Force
           if (Test-Path "platform-tools/AdbWinApi.dll") {
@@ -173,12 +173,18 @@ jobs:
             Copy-Item "platform-tools/AdbWinUsbApi.dll" "./AdbWinUsbApi.dll" -Force
           }
           Remove-Item -Recurse -Force platform-tools, pt.zip -ErrorAction SilentlyContinue
-          $FRIDA_TAG = (Invoke-WebRequest -Uri "https://github.com/frida/frida/releases/latest" -MaximumRedirection 0 -ErrorAction SilentlyContinue).Headers.Location.Split('/')[-1]
+          $FRIDA_TAG = (Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/frida/frida/releases/latest" -MaximumRedirection 0 -ErrorAction SilentlyContinue).Headers.Location.Split('/')[-1]
           $FRIDA_VER = $FRIDA_TAG -replace '^v',''
           Write-Host "Downloading frida-inject v${FRIDA_VER}"
           $BASE_URL = "https://github.com/frida/frida/releases/download/${FRIDA_TAG}"
-          Invoke-WebRequest -Uri "${BASE_URL}/frida-inject-${FRIDA_VER}-windows-x86_64.exe.xz" -OutFile frida-inject.exe.xz
-          & xz -df frida-inject.exe.xz
+          Invoke-WebRequest -UseBasicParsing -Uri "${BASE_URL}/frida-inject-${FRIDA_VER}-windows-x86_64.exe.xz" -OutFile frida-inject.exe.xz
+          if (Get-Command xz -ErrorAction SilentlyContinue) {
+            xz -df frida-inject.exe.xz
+          } elseif (Get-Command 7z -ErrorAction SilentlyContinue) {
+            7z x -y frida-inject.exe.xz
+          } else {
+            throw "xz or 7z required to decompress frida-inject"
+          }
           Move-Item frida-inject.exe "frida-inject-${TRIPLE}.exe" -Force
 
       - name: Cache cargo
