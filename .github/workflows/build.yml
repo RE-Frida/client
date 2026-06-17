@@ -110,7 +110,7 @@ jobs:
 
       - name: Install Rust toolchain (Windows)
         if: matrix.os == 'windows'
-        shell: pwsh
+        shell: powershell
         run: |
           Invoke-WebRequest -Uri "https://win.rustup.rs/x86_64" -OutFile "$env:TEMP\rustup-init.exe"
           & "$env:TEMP\rustup-init.exe" -y --default-toolchain nightly --default-host x86_64-pc-windows-msvc
@@ -204,7 +204,7 @@ jobs:
 
       - name: Rename binary (Windows)
         if: matrix.os == 'windows'
-        shell: pwsh
+        shell: powershell
         run: |
           Move-Item -Path "target/${{ matrix.target }}/release/re-frida-tauri.exe" `
                     -Destination "target/${{ matrix.target }}/release/${{ matrix.artifact }}.exe"
