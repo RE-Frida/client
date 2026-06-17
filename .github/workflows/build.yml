@@ -195,6 +195,10 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Setup MSVC dev command prompt (Windows)
+        if: matrix.os == 'windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Build Tauri app
         run: npx @tauri-apps/cli@latest build --target ${{ matrix.target }} ${{ matrix.features }} --no-bundle
         env:
