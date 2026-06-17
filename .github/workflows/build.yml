@@ -195,9 +195,25 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Setup MSVC dev command prompt (Windows)
+      - name: Setup MSVC environment (Windows)
         if: matrix.os == 'windows'
-        uses: ilammy/msvc-dev-cmd@v1
+        shell: powershell
+        run: |
+          $vswhere = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (Test-Path $vswhere) {
+            $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+            Write-Host "vswhere found: VS path = $vsPath"
+          } else {
+            Write-Host "vswhere not found at: $vswhere"
+          }
+          Write-Host "Checking common install paths..."
+          @(
+            "C:\Program Files\Microsoft Visual Studio\2022\BuildTools",
+            "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools",
+            "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools"
+          ) | ForEach-Object {
+            if (Test-Path $_) { Write-Host "  EXISTS: $_" }
+          }
 
       - name: Build Tauri app
         run: npx @tauri-apps/cli@latest build --target ${{ matrix.target }} ${{ matrix.features }} --no-bundle
