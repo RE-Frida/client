@@ -65,25 +65,25 @@ jobs:
       fail-fast: true
       matrix:
         include:
-          - runner: CZ3
+          - runner: self-hosted, Linux
             target: x86_64-unknown-linux-gnu
             artifact: re-frida-linux-amd64
             profile: release
             features: ""
             os: linux
-          # - runner: CZ3
+          # - runner: self-hosted, Linux
           #   target: x86_64-unknown-linux-gnu
           #   artifact: re-frida-linux-amd64-debug
           #   profile: debug
           #   features: "--features debug"
           #   os: linux
-          - runner: CZ3-Windows
+          - runner: self-hosted, Windows
             target: x86_64-pc-windows-msvc
             artifact: re-frida-windows-amd64
             profile: release
             features: ""
             os: windows
-          # - runner: CZ3-Windows
+          # - runner: self-hosted, Windows
           #   target: x86_64-pc-windows-msvc
           #   artifact: re-frida-windows-amd64-debug
           #   profile: debug
