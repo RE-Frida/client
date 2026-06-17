@@ -166,8 +166,12 @@ jobs:
           Invoke-WebRequest -Uri "https://dl.google.com/android/repository/platform-tools-latest-windows.zip" -OutFile pt.zip
           Expand-Archive -Path pt.zip -DestinationPath . -Force
           Copy-Item "platform-tools/adb.exe" "./adb-${TRIPLE}.exe" -Force
-          if (Test-Path "platform-tools/AdbWinApi.dll") { Copy-Item "platform-tools/AdbWinApi.dll" "./AdbWinApi.dll" -Force }
-          if (Test-Path "platform-tools/AdbWinUsbApi.dll") { Copy-Item "platform-tools/AdbWinUsbApi.dll" ./AdbWinUsbApi.dll" -Force }
+          if (Test-Path "platform-tools/AdbWinApi.dll") {
+            Copy-Item "platform-tools/AdbWinApi.dll" "./AdbWinApi.dll" -Force
+          }
+          if (Test-Path "platform-tools/AdbWinUsbApi.dll") {
+            Copy-Item "platform-tools/AdbWinUsbApi.dll" "./AdbWinUsbApi.dll" -Force
+          }
           Remove-Item -Recurse -Force platform-tools, pt.zip -ErrorAction SilentlyContinue
           $FRIDA_TAG = (Invoke-WebRequest -Uri "https://github.com/frida/frida/releases/latest" -MaximumRedirection 0 -ErrorAction SilentlyContinue).Headers.Location.Split('/')[-1]
           $FRIDA_VER = $FRIDA_TAG -replace '^v',''
